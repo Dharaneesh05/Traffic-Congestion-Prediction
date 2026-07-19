@@ -1,0 +1,42 @@
+# Python Virtual Environment
+.venv/
+venv/
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Datasets
+datasets/
+
+# YOLO Model Weights
+*.pt
+*.pth
+
+# Frontend Dependencies
+frontend/node_modules/
+node_modules/
+
+# Frontend Build
+frontend/dist/
+frontend/build/
+
+# Environment Variables
+.env
+.env.local
+
+# Jupyter Cache
+.ipynb_checkpoints/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Accidental file
+=2.10
