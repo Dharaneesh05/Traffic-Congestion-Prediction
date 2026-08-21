@@ -207,6 +207,7 @@ class FrameMetrics:
     road_occupancy:     float        # [0.0, 1.0]
     congestion_score:   float        # [0.0, 1.0]
     congestion_level:   str          # CongestionLevel value
+    movement_direction: str = "Unknown" # e.g. Northbound, Southbound
 
     # Breakdowns
     class_counts:       Dict[str, int]    = field(default_factory=dict)
@@ -225,6 +226,7 @@ class FrameMetrics:
             "road_occupancy":    round(self.road_occupancy, 4),
             "congestion_score":  round(self.congestion_score, 4),
             "congestion_level":  self.congestion_level,
+            "movement_direction":self.movement_direction,
             "class_counts":      self.class_counts,
             "speed_by_class":    {
                 cls: round(spd, 2) for cls, spd in self.speed_by_class.items()
@@ -436,6 +438,9 @@ class TrafficAnalyser:
 
         congestion_level = self._classify(congestion_score)
 
+        # ── 7. Movement Direction ──────────────────────────────────────────────
+        movement_direction = self._compute_movement_direction(trajectories or {})
+
         # ── Build FrameMetrics ────────────────────────────────────────────────
         metrics = FrameMetrics(
             frame_index       = frame_index,
@@ -448,6 +453,7 @@ class TrafficAnalyser:
             road_occupancy    = road_occupancy,
             congestion_score  = congestion_score,
             congestion_level  = congestion_level,
+            movement_direction= movement_direction,
             class_counts      = class_counts,
             speed_by_class    = speed_by_class,
         )
@@ -514,6 +520,34 @@ class TrafficAnalyser:
         if self.config.road_area_m2 <= 0:
             return 0.0
         return (vehicle_count / self.config.road_area_m2) * 100.0
+
+    def _compute_movement_direction(self, trajectories: Dict[int, List[Tuple[float, float]]]) -> str:
+        """
+        Estimate the overall dominant movement direction of traffic in this frame.
+        Computes the net vector of all active trajectories.
+        """
+        if not trajectories:
+            return "Unknown"
+        
+        total_dx = 0.0
+        total_dy = 0.0
+        
+        for traj in trajectories.values():
+            if len(traj) >= 2:
+                # Compare oldest point in trajectory buffer to newest
+                dx = traj[-1][0] - traj[0][0]
+                dy = traj[-1][1] - traj[0][1]
+                total_dx += dx
+                total_dy += dy
+                
+        if total_dx == 0 and total_dy == 0:
+            return "Static"
+            
+        # Determine dominant axis
+        if abs(total_dx) > abs(total_dy):
+            return "Eastbound" if total_dx > 0 else "Westbound"
+        else:
+            return "Southbound" if total_dy > 0 else "Northbound"
 
     def _compute_speed(
         self,

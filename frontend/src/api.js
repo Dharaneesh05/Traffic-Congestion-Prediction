@@ -5,7 +5,7 @@
  * All calls to the FastAPI backend are centralized here.
  */
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = "http://127.0.0.1:8000/api";
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 
@@ -86,16 +86,42 @@ export const getCameraStats = async (camId) =>
   get(`${API_BASE}/camera/${camId}/stats`);
 
 /**
- * Route by human-readable name (no lat/lon needed in frontend).
- * @param {string} fromName  - e.g. "Salem Bus Stand"
- * @param {string} toName    - e.g. "Erode Bus Stand"
+ * Get the status of the routing service (is OSM graph loaded?).
  */
-export const getRouteByName = async (fromName, toName) =>
-  post(`${API_BASE}/get-route-by-name`, {
+export const getRoutingStatus = async () =>
+  get(`${API_BASE}/routing-status`);
+
+/**
+ * Route by human-readable name or coordinates.
+ * @param {string} fromName
+ * @param {string} toName
+ * @param {object} fromCoords - {lat, lon}
+ * @param {object} toCoords - {lat, lon}
+ */
+export const getRouteByName = async (fromName, toName, fromCoords = null, toCoords = null) => {
+  const payload = {
     from_name: fromName,
     to_name: toName,
-  });
+  };
+  if (fromCoords) {
+    payload.from_lat = fromCoords.lat;
+    payload.from_lon = fromCoords.lon;
+  }
+  if (toCoords) {
+    payload.to_lat = toCoords.lat;
+    payload.to_lon = toCoords.lon;
+  }
+  return post(`${API_BASE}/get-route-by-name`, payload);
+};
 
 /** AI recommendations from all active cameras */
 export const getAgentReport = async () =>
   get(`${API_BASE}/agent-report`);
+
+/**
+ * Aggregate real-time metrics across all 4 cameras.
+ * Returns total_vehicles, avg_speed_kmh, avg_congestion_score, class_counts, per_camera[].
+ */
+export const getCamerasAggregate = async () =>
+  get(`${API_BASE}/cameras/aggregate`);
+

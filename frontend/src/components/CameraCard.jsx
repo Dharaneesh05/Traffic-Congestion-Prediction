@@ -1,21 +1,26 @@
-/**
+﻿/**
  * CameraCard.jsx
- * Individual CCTV camera card with animated feed simulation,
- * real-time YOLO11 stats, and controls.
+ * Individual CCTV camera card with real YOLO11 + ByteTrack stats.
+ *
+ * IMPORTANT — No fake data:
+ *   - Vehicle counts come from backend /api/camera/{id}/stats
+ *   - Per-class breakdown (car/truck/bus/motorcycle) from real class_counts
+ *   - Status (LIVE/OFFLINE) reflects actual is_processing state
+ *   - When no data: displays "WAITING FOR DATA" or "NO DATA"
  */
 
 import { useState, useEffect, useRef } from "react";
 import { startCamera, stopCamera, getCameraStats } from "../api";
-import { Play, Square, Wifi, WifiOff, Car, Truck, Zap } from "lucide-react";
+import { Play, Square } from "lucide-react";
 import { motion } from "framer-motion";
 import CongestionBadge from "./CongestionBadge";
 
-// Simulated detection boxes overlaid on the CCTV placeholder
-const FAKE_BOXES = [
-  { x: "12%", y: "25%", w: "18%", h: "22%", color: "#10b981", label: "Car" },
-  { x: "42%", y: "35%", w: "14%", h: "18%", color: "#3b82f6", label: "Truck" },
-  { x: "65%", y: "20%", w: "16%", h: "20%", color: "#f59e0b", label: "Bike" },
-  { x: "28%", y: "55%", w: "20%", h: "24%", color: "#10b981", label: "Car" },
+// Class display config — matches backend CLASS_NAMES in detect.py
+const CLASS_CONFIG = [
+  { key: "car",        label: "Cars",  color: "var(--accent-success)" },
+  { key: "truck",      label: "Truck", color: "var(--accent-warning)" },
+  { key: "bus",        label: "Bus",   color: "var(--accent-orange)"  },
+  { key: "motorcycle", label: "Bike",  color: "var(--accent-purple)"  },
 ];
 
 export default function CameraCard({ camera }) {
@@ -38,7 +43,7 @@ export default function CameraCard({ camera }) {
       try {
         const data = await getCameraStats(camera.id);
         setStats(data);
-      } catch { /* ignore */ }
+      } catch { /* keep last known state */ }
     };
     poll();
     pollRef.current = setInterval(poll, 2000);
@@ -60,17 +65,15 @@ export default function CameraCard({ camera }) {
     finally { setLoading(false); }
   };
 
-  const metrics = stats?.metrics || {};
-  const level   = metrics.congestion_level || "FREE_FLOW";
-  const score   = metrics.congestion_score ?? 0;
-  const count   = metrics.vehicle_count ?? 0;
-  const speed   = metrics.average_speed_kmh ?? 0;
-
-  // Fake per-type vehicle breakdown (proportional to total count)
-  const carCount   = Math.round(count * 0.55);
-  const busCount   = Math.round(count * 0.10);
-  const truckCount = Math.round(count * 0.15);
-  const bikeCount  = count - carCount - busCount - truckCount;
+  // Extract REAL metrics from backend
+  const metrics     = stats?.metrics || {};
+  const hasData     = isActive && Object.keys(metrics).length > 0;
+  const level       = metrics.congestion_level || "FREE_FLOW";
+  const score       = metrics.congestion_score ?? 0;
+  const count       = metrics.vehicle_count ?? 0;
+  const speed       = metrics.average_speed_kmh ?? 0;
+  // Real per-class counts from YOLO11 (detect.py CLASS_NAMES: car, truck, bus, motorcycle)
+  const classCounts = metrics.class_counts || {};
 
   const scoreColor = score > 0.7 ? "var(--accent-danger)"
     : score > 0.45 ? "var(--accent-warning)"
@@ -88,7 +91,10 @@ export default function CameraCard({ camera }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm">{camera.name}</span>
-            <span className="status-dot" style={{ background: isActive ? "var(--accent-success)" : "var(--text-muted)", boxShadow: isActive ? "0 0 6px var(--accent-success)" : "none" }} />
+            <span className="status-dot" style={{
+              background: isActive ? "var(--accent-success)" : "var(--text-muted)",
+              boxShadow: isActive ? "0 0 6px var(--accent-success)" : "none"
+            }} />
           </div>
           <div className="text-xs text-muted">{camera.location}</div>
         </div>
@@ -101,56 +107,56 @@ export default function CameraCard({ camera }) {
           ) : (
             <span className="badge badge-ghost">OFFLINE</span>
           )}
-          <CongestionBadge level={level} />
+          {hasData && <CongestionBadge level={level} />}
         </div>
       </div>
 
       {/* Camera Viewport */}
       <div className="camera-viewport" style={{ background: "#060809" }}>
-        {/* Gradient background simulating road at night */}
+        {/* Dark gradient background (cosmetic) */}
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(180deg, #0a0e14 0%, #111820 40%, #0d1218 100%)",
         }} />
 
-        {/* Grid lines — road markings */}
+        {/* Grid lines — road markings (cosmetic) */}
         <div style={{
           position: "absolute", inset: 0,
           backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
           backgroundSize: "40px 40px",
         }} />
 
-        {/* Scan line */}
+        {/* Scan line (cosmetic animation) */}
         {isActive && <div className="scan-line" />}
 
-        {/* Detection bounding boxes */}
-        {isActive && FAKE_BOXES.map((b, i) => (
-          <motion.div
-            key={i}
-            className="detection-box"
-            style={{ position: "absolute", left: b.x, top: b.y, width: b.w, height: b.h, borderColor: b.color }}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: [0, 1, 1, 0.7, 1], scale: 1 }}
-            transition={{ delay: i * 0.2, duration: 0.4, repeat: Infinity, repeatDelay: 5 }}
-          >
-            <span style={{
-              position: "absolute", top: -16, left: 0,
-              fontSize: "0.55rem", fontFamily: "var(--font-mono)",
-              background: b.color, color: "#fff", padding: "1px 4px", borderRadius: "2px"
-            }}>
-              {b.label}
-            </span>
-          </motion.div>
-        ))}
-
-        {/* Pulse when active but no boxes yet */}
-        {isActive && (
-          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-            <div className="pulse-ring" />
+        {/* OFFLINE state */}
+        {!isActive && (
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: "0.5rem",
+          }}>
+            <div style={{ fontSize: "0.65rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)", letterSpacing: "0.08em" }}>
+              OFFLINE — PRESS START TO ANALYSE
+            </div>
           </div>
         )}
 
-        {/* CCTV overlay */}
+        {/* Active but waiting for first data */}
+        {isActive && !hasData && (
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: "0.5rem",
+          }}>
+            <div className="spinner" style={{ width: 20, height: 20, borderTopColor: "var(--accent-primary)" }} />
+            <div style={{ fontSize: "0.6rem", fontFamily: "var(--font-mono)", color: "var(--text-muted)", letterSpacing: "0.08em" }}>
+              WAITING FOR DATA
+            </div>
+          </div>
+        )}
+
+        {/* CCTV overlay (cosmetic — ID, name, timestamp) */}
         <div className="cctv-overlay">
           <div className="cctv-top">
             <span className="cctv-text">CAM {String(camera.id).padStart(2, "0")} — {camera.name.toUpperCase()}</span>
@@ -165,32 +171,50 @@ export default function CameraCard({ camera }) {
         {/* YOLO11 label when active */}
         {isActive && (
           <div style={{ position: "absolute", top: 6, left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>
-            <span style={{ fontSize: "0.55rem", fontFamily: "var(--font-mono)", background: "rgba(59,130,246,0.85)", color: "#fff", padding: "1px 6px", borderRadius: "2px" }}>
+            <span style={{
+              fontSize: "0.55rem", fontFamily: "var(--font-mono)",
+              background: "rgba(59,130,246,0.85)", color: "#fff",
+              padding: "1px 6px", borderRadius: "2px"
+            }}>
               YOLO11 + ByteTrack
+            </span>
+          </div>
+        )}
+
+        {/* Real-time vehicle count overlay when data available */}
+        {hasData && (
+          <div style={{
+            position: "absolute", bottom: 28, right: 8, zIndex: 10,
+            background: "rgba(0,0,0,0.6)", borderRadius: 4, padding: "2px 6px",
+          }}>
+            <span style={{ fontSize: "0.6rem", fontFamily: "var(--font-mono)", color: "var(--accent-success)" }}>
+              {count} vehicles detected
             </span>
           </div>
         )}
       </div>
 
-      {/* Stats row */}
-      {isActive && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="grid grid-cols-4 gap-2"
-        >
-          {[
-            { label: "Cars",  value: carCount,   color: "var(--accent-success)" },
-            { label: "Bus",   value: busCount,   color: "var(--accent-warning)" },
-            { label: "Truck", value: truckCount, color: "var(--accent-orange)" },
-            { label: "Bike",  value: bikeCount,  color: "var(--accent-purple)" },
-          ].map((item) => (
-            <div key={item.label} className="text-center p-2 rounded-md" style={{ background: "rgba(255,255,255,0.03)" }}>
-              <div className="font-bold font-mono text-base" style={{ color: item.color }}>{item.value}</div>
+      {/* Real per-class vehicle counts from YOLO11 */}
+      {hasData ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-4 gap-2">
+          {CLASS_CONFIG.map((item) => (
+            <div key={item.key} className="text-center p-2 rounded-md" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <div className="font-bold font-mono text-base" style={{ color: item.color }}>
+                {classCounts[item.key] ?? 0}
+              </div>
               <div className="text-xs text-muted">{item.label}</div>
             </div>
           ))}
         </motion.div>
+      ) : (
+        <div className="grid grid-cols-4 gap-2">
+          {CLASS_CONFIG.map((item) => (
+            <div key={item.key} className="text-center p-2 rounded-md" style={{ background: "rgba(255,255,255,0.02)" }}>
+              <div className="font-bold font-mono text-base text-muted">—</div>
+              <div className="text-xs text-muted">{item.label}</div>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Metrics bar */}
@@ -198,15 +222,24 @@ export default function CameraCard({ camera }) {
         <div className="flex items-center gap-4 text-xs text-secondary">
           <span>
             <span className="text-muted">Speed: </span>
-            <span className="font-mono font-bold text-primary">{speed.toFixed(0)} km/h</span>
+            {hasData
+              ? <span className="font-mono font-bold text-primary">{speed.toFixed(0)} km/h</span>
+              : <span className="text-muted font-mono">NO DATA</span>
+            }
           </span>
           <span>
             <span className="text-muted">Vehicles: </span>
-            <span className="font-mono font-bold text-primary">{count}</span>
+            {hasData
+              ? <span className="font-mono font-bold text-primary">{count}</span>
+              : <span className="text-muted font-mono">NO DATA</span>
+            }
           </span>
           <span>
             <span className="text-muted">Score: </span>
-            <span className="font-mono font-bold" style={{ color: scoreColor }}>{(score * 100).toFixed(0)}%</span>
+            {hasData
+              ? <span className="font-mono font-bold" style={{ color: scoreColor }}>{(score * 100).toFixed(0)}%</span>
+              : <span className="text-muted font-mono">NO DATA</span>
+            }
           </span>
         </div>
         <button

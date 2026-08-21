@@ -146,7 +146,6 @@ def initialize_backend():
 def _load_route_graph_thread():
     """
     Load the OSM road graph in a background thread so the server stays responsive.
-    This runs after initialize_backend() completes, in a ThreadPoolExecutor.
     Once loaded, app_state.route_planner._is_loaded becomes True and
     /api/get-route-by-name will start returning routes.
     """
@@ -154,10 +153,23 @@ def _load_route_graph_thread():
         print("[System] [BG] Loading OSM graph from PBF...")
         app_state.route_planner.load()
         print("[System] [BG] OSM graph loaded successfully — routing is now available!")
+    except FileNotFoundError as e:
+        msg = str(e)
+        print(f"[System] [BG] ERROR: OSM PBF file not found: {msg}")
+        if app_state.route_planner:
+            app_state.route_planner._load_error = msg
+    except ImportError as e:
+        msg = f"Missing dependency: {e}. Install pyrosm and osmnx."
+        print(f"[System] [BG] ERROR: {msg}")
+        if app_state.route_planner:
+            app_state.route_planner._load_error = msg
     except Exception as e:
-        print(f"[System] [BG] Warning: Failed to load OSM graph: {e}")
         import traceback
+        msg = str(e)
+        print(f"[System] [BG] Warning: Failed to load OSM graph: {msg}")
         traceback.print_exc()
+        if app_state.route_planner:
+            app_state.route_planner._load_error = msg
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -197,12 +209,8 @@ async def process_video_stream():
             # But the prompt asks to "Start Tracking" / "Start Detection".
             # For simplicity, we run the detector and optionally the tracker.
             
-            det_result = app_state.detector.detect(frame)
-            detections = det_result.detections
-            trajectories = []
-            
             if app_state.enable_tracking:
-                track_result = app_state.tracker.update(frame, detections, frame_idx, timestamp_ms)
+                track_result = app_state.tracker.track_frame(frame, camera_id="UPLOAD", timestamp_ms=timestamp_ms)
                 detections = track_result.detections
                 trajectories = track_result.trajectories
                 
@@ -217,6 +225,15 @@ async def process_video_stream():
                 if frame_idx % int(fps) == 0:
                     hist = app_state.analyser.get_history(last_n=60, as_dicts=True)
                     app_state.latest_forecast = app_state.predictor.predict_live(hist)
+            else:
+                det_result = app_state.detector.detect(
+                    frame,
+                    frame_index=frame_index,
+                    timestamp_ms=timestamp_ms,
+                    camera_id="UPLOAD"
+                )
+                detections = det_result.detections
+                trajectories = []
                     
         # Sleep to simulate real-time processing and yield to event loop
         await asyncio.sleep(1.0 / fps)
@@ -382,48 +399,49 @@ async def get_locations():
 
 @app.get("/api/cameras")
 async def get_cameras():
-    """Return camera configuration list (without internal video paths)."""
-    return {
-        "cameras": [
-            {
-                "id":       cam["id"],
-                "name":     cam["name"],
-                "location": cam["location"],
-                "address":  cam["address"],
-                "lat":      cam["lat"],
-                "lon":      cam["lon"],
-                "status":   "online",
-            }
-            for cam in CAMERAS
-        ]
-    }
+    """Return camera configuration list."""
+    # Build a clean list for the frontend to digest easily, including live status
+    cams = []
+    for cam in CAMERAS:
+        state = _get_camera_state(cam["camera_id"])
+        cams.append({
+            "id":          cam["camera_id"],
+            "name":        cam["camera_name"],
+            "location":    cam["location"],
+            "address":     cam["address"],
+            "lat":         cam["lat"],
+            "lon":         cam["lon"],
+            "source_type": cam["source_type"],
+            "status":      state["status"],
+        })
+    return {"cameras": cams}
 
 
 # ── Per-camera state store ──
 # Holds separate AppState-like dicts for each camera ID.
 _camera_states: dict = {}
 
-def _get_camera_state(cam_id: int) -> dict:
+def _get_camera_state(cam_id: str) -> dict:
     if cam_id not in _camera_states:
         _camera_states[cam_id] = {
-            "is_processing": False,
+            "status": "OFFLINE",  # OFFLINE, CONNECTING, ONLINE
             "metrics": {},
             "forecast": {},
+            "analyser": None,
         }
     return _camera_states[cam_id]
 
 
-async def _process_camera_stream(cam_id: int, video_path: str):
+async def _process_camera_stream(cam_id: str, source_type: str, source: any):
     """Background worker for a specific camera feed."""
     state = _get_camera_state(cam_id)
-    state["is_processing"] = True
-
-    # Re-use the global detector/tracker/counter/analyser/predictor instances
+    
+    # Check global models
     if not app_state.detector:
-        state["is_processing"] = False
+        state["status"] = "OFFLINE"
         return
 
-    # Independent tracker & counter per camera
+    # Initialize independent tracker & counter per camera
     from track import Tracker
     from counter import VehicleCounter, LineConfig
     from traffic_analysis import TrafficAnalyser, AnalysisConfig
@@ -433,25 +451,47 @@ async def _process_camera_stream(cam_id: int, video_path: str):
         LineConfig(name="L1", p1=(0.1, 0.5), p2=(0.9, 0.5), direction="both")
     ])
     cam_analyser = TrafficAnalyser(AnalysisConfig(fps=30.0))
+    state["analyser"] = cam_analyser
 
-    cap = cv2.VideoCapture(video_path)
+    try:
+        cap = cv2.VideoCapture(source)
+    except Exception as e:
+        print(f"[Camera {cam_id}] Failed to open VideoCapture: {e}")
+        state["status"] = "OFFLINE"
+        return
+
+    if not cap.isOpened():
+        print(f"[Camera {cam_id}] Failed to open source '{source}'")
+        state["status"] = "OFFLINE"
+        return
+
+    # Connection successful
+    state["status"] = "ONLINE"
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    if fps <= 0 or fps > 60:
+        fps = 30.0
+        
     frame_idx = 0
+    print(f"[Camera {cam_id}] Stream ONLINE (FPS: {fps})")
 
-    while state["is_processing"] and cap.isOpened():
+    while state["status"] == "ONLINE" and cap.isOpened():
         ret, frame = cap.read()
         if not ret:
-            # Loop video to simulate live feed
-            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = cap.read()
-            if not ret:
+            if source_type == "video":
+                # Loop MP4 files automatically for continuous demonstration
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+                if not ret:
+                    break
+            else:
+                # Stream died (e.g. webcam unplugged, IP camera down)
+                print(f"[Camera {cam_id}] Stream interrupted.")
                 break
 
         timestamp_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
         frame_idx += 1
 
-        det_result = app_state.detector.detect(frame)
-        track_result = cam_tracker.update(frame, det_result.detections, frame_idx, timestamp_ms)
+        track_result = cam_tracker.track_frame(frame, camera_id=cam_id, timestamp_ms=timestamp_ms)
         events = cam_counter.update(track_result.detections, frame_idx)
         metrics = cam_analyser.update(
             track_result.detections, track_result.trajectories,
@@ -466,56 +506,81 @@ async def _process_camera_stream(cam_id: int, video_path: str):
         await asyncio.sleep(1.0 / fps)
 
     cap.release()
-    state["is_processing"] = False
+    state["status"] = "OFFLINE"
+    state["analyser"] = None
+    print(f"[Camera {cam_id}] Stream OFFLINE")
 
 
 # ── 9. /camera/{id}/start ──
 
 @app.post("/api/camera/{cam_id}/start")
-async def start_camera(cam_id: int, background_tasks: BackgroundTasks):
+async def start_camera(cam_id: str, background_tasks: BackgroundTasks):
     """Start processing a specific camera's video feed."""
-    cam = next((c for c in CAMERAS if c["id"] == cam_id), None)
+    cam = next((c for c in CAMERAS if c["camera_id"] == cam_id), None)
     if not cam:
         raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
 
     import os
-    if not os.path.exists(cam["video"]):
-        raise HTTPException(status_code=404, detail=f"Video file not found: {cam['video']}")
+    if cam["source_type"] == "video" and not os.path.exists(cam["source"]):
+        raise HTTPException(status_code=404, detail=f"Video file not found: {cam['source']}")
 
     state = _get_camera_state(cam_id)
-    if not state["is_processing"]:
-        background_tasks.add_task(_process_camera_stream, cam_id, cam["video"])
-        return {"message": f"Camera {cam_id} ({cam['name']}) started."}
-    return {"message": f"Camera {cam_id} is already processing."}
+    if state["status"] == "OFFLINE":
+        state["status"] = "CONNECTING"
+        background_tasks.add_task(_process_camera_stream, cam_id, cam["source_type"], cam["source"])
+        return {"message": f"Camera {cam_id} ({cam['camera_name']}) connecting..."}
+    return {"message": f"Camera {cam_id} is already {state['status']}."}
 
 
 # ── 10. /camera/{id}/stop ──
 
 @app.post("/api/camera/{cam_id}/stop")
-async def stop_camera(cam_id: int):
+async def stop_camera(cam_id: str):
     """Stop processing a specific camera feed."""
     state = _get_camera_state(cam_id)
-    state["is_processing"] = False
+    state["status"] = "OFFLINE"
     return {"message": f"Camera {cam_id} stopped."}
 
 
 # ── 11. /camera/{id}/stats ──
 
 @app.get("/api/camera/{cam_id}/stats")
-async def get_camera_stats(cam_id: int):
+async def get_camera_stats(cam_id: str):
     """Return latest metrics and forecast for a specific camera."""
-    cam = next((c for c in CAMERAS if c["id"] == cam_id), None)
+    cam = next((c for c in CAMERAS if c["camera_id"] == cam_id), None)
     if not cam:
         raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
 
     state = _get_camera_state(cam_id)
     return {
         "camera_id":    cam_id,
-        "camera_name":  cam["name"],
-        "is_processing": state["is_processing"],
+        "camera_name":  cam["camera_name"],
+        "status":       state["status"],
         "metrics":      state["metrics"],
         "forecast":     state["forecast"],
     }
+
+
+# ── 12. /camera/{id}/analytics/summary ──
+
+@app.get("/api/camera/{cam_id}/analytics/summary")
+async def get_camera_analytics_summary(cam_id: str):
+    """Return aggregated session statistics (time window)."""
+    state = _get_camera_state(cam_id)
+    if state["status"] != "ONLINE" or not state["analyser"]:
+        raise HTTPException(status_code=400, detail="Camera is offline or analyser not ready.")
+    return state["analyser"].get_session_summary()
+
+
+# ── 13. /camera/{id}/analytics/history ──
+
+@app.get("/api/camera/{cam_id}/analytics/history")
+async def get_camera_analytics_history(cam_id: str, last_n: int = 60):
+    """Return historical metrics over a time window."""
+    state = _get_camera_state(cam_id)
+    if state["status"] != "ONLINE" or not state["analyser"]:
+        raise HTTPException(status_code=400, detail="Camera is offline or analyser not ready.")
+    return state["analyser"].get_history(last_n=last_n, as_dicts=True)
 
 
 # ── 12. /get-route-by-name ──
@@ -523,35 +588,87 @@ async def get_camera_stats(cam_id: int):
 class NamedRouteRequest(BaseModel):
     from_name: str
     to_name: str
+    from_lat: Optional[float] = None
+    from_lon: Optional[float] = None
+    to_lat: Optional[float] = None
+    to_lon: Optional[float] = None
 
 @app.post("/api/get-route-by-name")
 async def get_route_by_name(req: NamedRouteRequest):
     """
-    Resolve human-readable Tamil Nadu location names to coordinates
-    and run the A* route planner. Frontend never needs lat/lon.
+    Accepts coordinates or resolves from config.py LOCATIONS.
+    Runs the A* route planner.
     """
     print(f"[API] POST /api/get-route-by-name: {req.from_name} -> {req.to_name}")
-    if req.from_name not in LOCATIONS:
-        print(f"[API] FAILED: Origin '{req.from_name}' does not exist.")
+    
+    # Resolve Origin
+    if req.from_lat is not None and req.from_lon is not None:
+        origin = (req.from_lat, req.from_lon)
+        print(f"[API] Origin coords provided: {origin}")
+    elif req.from_name in LOCATIONS:
+        origin = LOCATIONS[req.from_name]
+    else:
+        print(f"[API] FAILED: Origin '{req.from_name}' does not exist and coords missing.")
         raise HTTPException(status_code=400, detail=f"Unknown location: '{req.from_name}'")
-    else:
-        print(f"[API] Verify 4: {req.from_name} exists. (SUCCESS)")
 
-    if req.to_name not in LOCATIONS:
-        print(f"[API] FAILED: Destination '{req.to_name}' does not exist.")
-        raise HTTPException(status_code=400, detail=f"Unknown location: '{req.to_name}'")
+    # Resolve Destination
+    if req.to_lat is not None and req.to_lon is not None:
+        destination = (req.to_lat, req.to_lon)
+        print(f"[API] Destination coords provided: {destination}")
+    elif req.to_name in LOCATIONS:
+        destination = LOCATIONS[req.to_name]
     else:
-        print(f"[API] Verify 5: {req.to_name} exists. (SUCCESS)")
+        print(f"[API] FAILED: Destination '{req.to_name}' does not exist and coords missing.")
+        raise HTTPException(status_code=400, detail=f"Unknown location: '{req.to_name}'")
 
     if not app_state.route_planner or not app_state.route_planner._is_loaded:
-        print("[API] FAILED: Route map is not loaded yet.")
+        err_msg = getattr(app_state.route_planner, "_load_error", None)
+        if err_msg:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Route service failed to load: {err_msg}"
+            )
         raise HTTPException(
             status_code=503,
-            detail="Route map is still loading from OSM data (this takes ~2 minutes on first run). Please wait and try again."
+            detail="Route service is temporarily unavailable (loading graph). Please try again in a moment."
         )
 
-    origin = LOCATIONS[req.from_name]
-    destination = LOCATIONS[req.to_name]
+    # ── Inject live congestion from active cameras before routing ────────────
+    # Build a CongestionMap from all ONLINE cameras and merge them so the
+    # route planner's A* uses real observed congestion scores.
+    from route import CongestionMap as CMap
+    try:
+        camera_maps = []
+        for cam in CAMERAS:
+            cid = cam["camera_id"]
+            cam_state = _get_camera_state(cid)
+            if cam_state["status"] == "ONLINE" and cam_state.get("metrics"):
+                score = cam_state["metrics"].get("congestion_score", 0.0)
+                if score > 0:
+                    cmap = CMap.from_frame_metrics(
+                        congestion_score=score,
+                        graph=app_state.route_planner._graph,
+                        camera_lat=cam["lat"],
+                        camera_lon=cam["lon"],
+                        radius_m=1000.0,
+                    )
+                    camera_maps.append(cmap)
+
+        if camera_maps:
+            merged = CMap.merge(camera_maps)
+            app_state.route_planner.update_congestion(merged)
+        else:
+            # Also inject from the upload-video stream if active
+            if app_state.latest_metrics and app_state.latest_metrics.get("congestion_score", 0) > 0:
+                score = app_state.latest_metrics["congestion_score"]
+                # Use origin camera location as approximation
+                cmap = CMap(source="upload_stream", horizon="current")
+                # Apply to all graph nodes (global fallback when no camera coords)
+                for nid in list(app_state.route_planner._node_coords)[:500]:
+                    cmap.set(nid, score)
+                app_state.route_planner.update_congestion(cmap)
+    except Exception as cmap_err:
+        print(f"[API] Congestion injection warning: {cmap_err} (routing will use distance-only)")
 
     comparison = app_state.route_planner.compare_routes(
         origin=origin,
@@ -567,6 +684,34 @@ async def get_route_by_name(req: NamedRouteRequest):
     return comparison
 
 
+# ── 12.5. /routing-status ──
+
+@app.get("/api/routing-status")
+async def get_routing_status():
+    """Return whether the OSM graph has finished loading, plus graph stats."""
+    if not app_state.route_planner:
+        return {"status": "initializing", "error": "RoutePlanner not initialized"}
+
+    is_ready = app_state.route_planner._is_loaded
+    error_msg = getattr(app_state.route_planner, "_load_error", None)
+
+    if error_msg:
+        return {
+            "status": "error",
+            "error": error_msg,
+            "is_loaded": False,
+            "node_count": 0,
+            "edge_count": 0,
+        }
+
+    stats = app_state.route_planner.get_stats() if is_ready else {}
+    return {
+        "status": "ready" if is_ready else "initializing",
+        "error": None,
+        **stats,
+    }
+
+
 # ── 13. /agent-report ──
 
 @app.get("/api/agent-report")
@@ -580,15 +725,15 @@ async def get_agent_report():
     recommendations = []
 
     for cam in CAMERAS:
-        cid = cam["id"]
+        cid = cam["camera_id"]
         state = _get_camera_state(cid)
-        if state["metrics"]:
+        if state["status"] == "ONLINE" and state["metrics"]:
             metrics = state["metrics"]
             level = metrics.get("congestion_level", "FREE_FLOW")
             score = metrics.get("congestion_score", 0.0)
             active_cameras.append({
                 "id": cid,
-                "name": cam["name"],
+                "name": cam["camera_name"],
                 "level": level,
                 "score": round(score, 3),
                 "vehicle_count": metrics.get("vehicle_count", 0),
@@ -598,10 +743,10 @@ async def get_agent_report():
             # Generate recommendation per camera
             if level in ("HEAVY", "CONGESTED"):
                 recommendations.append({
-                    "camera": cam["name"],
+                    "camera": cam["camera_name"],
                     "severity": "HIGH",
                     "message": (
-                        f"Heavy congestion detected at {cam['name']}. "
+                        f"Heavy congestion detected at {cam['camera_name']}. "
                         f"Suggest diverting heavy vehicles through NH544 bypass. "
                         f"Estimated clearance: 20 minutes."
                     ),
@@ -610,10 +755,10 @@ async def get_agent_report():
                 })
             elif level == "MODERATE":
                 recommendations.append({
-                    "camera": cam["name"],
+                    "camera": cam["camera_name"],
                     "severity": "MEDIUM",
                     "message": (
-                        f"Moderate traffic at {cam['name']}. "
+                        f"Moderate traffic at {cam['camera_name']}. "
                         f"Monitor for escalation. No immediate action required."
                     ),
                     "confidence": min(85, int(score * 100 + 15)),
@@ -650,6 +795,73 @@ async def get_agent_report():
             f"Network status: {network_status}. "
             f"Average congestion score: {avg_score:.2f}."
         ),
+    }
+
+
+# ── 14. /cameras/aggregate ──
+
+@app.get("/api/cameras/aggregate")
+async def get_cameras_aggregate():
+    """
+    Aggregate real-time metrics across all active cameras.
+    Used by the Dashboard KPI cards and TrafficAnalytics page.
+
+    Returns:
+        total_vehicles      : Sum of vehicle_count across all active cameras
+        avg_speed_kmh       : Mean average_speed_kmh across active cameras
+        avg_congestion_score: Mean congestion_score across active cameras
+        active_camera_count : Number of cameras currently processing
+        class_counts        : Aggregated per-class vehicle counts (car/truck/bus/motorcycle)
+        per_camera          : Per-camera breakdown list
+    """
+    per_camera = []
+    total_vehicles = 0
+    speed_sum = 0.0
+    score_sum = 0.0
+    active_count = 0
+    class_totals: dict = {"car": 0, "truck": 0, "bus": 0, "motorcycle": 0}
+
+    for cam in CAMERAS:
+        cid = cam["camera_id"]
+        state = _get_camera_state(cid)
+        m = state.get("metrics", {})
+
+        is_active = state.get("status") == "ONLINE"
+        count = m.get("vehicle_count", 0)
+        speed = m.get("average_speed_kmh", 0.0)
+        score = m.get("congestion_score", 0.0)
+        level = m.get("congestion_level", "FREE_FLOW")
+        cc    = m.get("class_counts", {})
+
+        if is_active and m:
+            active_count += 1
+            total_vehicles += count
+            speed_sum += speed
+            score_sum += score
+            for cls in class_totals:
+                class_totals[cls] += cc.get(cls, 0)
+
+        per_camera.append({
+            "id":                cam["camera_id"],
+            "name":              cam["camera_name"],
+            "status":            state.get("status", "OFFLINE"),
+            "vehicle_count":     count,
+            "average_speed_kmh": round(speed, 1),
+            "congestion_score":  round(score, 3),
+            "congestion_level":  level,
+            "class_counts":      cc,
+        })
+
+    avg_speed = round(speed_sum / active_count, 1) if active_count > 0 else 0.0
+    avg_score = round(score_sum / active_count, 3) if active_count > 0 else 0.0
+
+    return {
+        "active_camera_count":  active_count,
+        "total_vehicles":       total_vehicles,
+        "avg_speed_kmh":        avg_speed,
+        "avg_congestion_score": avg_score,
+        "class_counts":         class_totals,
+        "per_camera":           per_camera,
     }
 
 

@@ -1,45 +1,57 @@
 /**
  * LocationSearch.jsx
- * Autocomplete search box for Tamil Nadu locations.
+ * Autocomplete search box for locations using OpenStreetMap Nominatim.
  * Resolves to {name, lat, lon} on selection.
  */
 
 import { useState, useEffect, useRef } from "react";
 import { MapPin, Search, X } from "lucide-react";
-import { getLocations } from "../api";
-
-let _cachedLocations = null;
 
 export default function LocationSearch({ placeholder, value, onChange, icon }) {
   const [query, setQuery] = useState(value?.name || "");
-  const [locations, setLocations] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const ref = useRef(null);
   const Icon = icon || MapPin;
 
+  // Sync internal state if value prop changes externally (e.g. swap button)
   useEffect(() => {
-    const loadLocs = async () => {
-      if (_cachedLocations) { setLocations(_cachedLocations); return; }
-      setLoading(true);
-      try {
-        const data = await getLocations();
-        _cachedLocations = data.locations || [];
-        setLocations(_cachedLocations);
-      } catch { /* offline fallback */ }
-      finally { setLoading(false); }
-    };
-    loadLocs();
-  }, []);
+    if (value) {
+      setQuery(value.name);
+    } else {
+      setQuery("");
+    }
+  }, [value]);
 
   useEffect(() => {
-    if (!query.trim()) { setFiltered([]); return; }
-    const q = query.toLowerCase();
-    setFiltered(
-      locations.filter((l) => l.name.toLowerCase().includes(q)).slice(0, 8)
-    );
-  }, [query, locations]);
+    if (!query.trim() || query === value?.name) { 
+      setFiltered([]); 
+      return; 
+    }
+    
+    const timeoutId = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&countrycodes=in`);
+        const data = await res.json();
+        
+        const results = data.map(item => ({
+          name: item.display_name,
+          lat: parseFloat(item.lat),
+          lon: parseFloat(item.lon)
+        }));
+        
+        setFiltered(results);
+      } catch (err) {
+        console.error("Geocoding failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    }, 600); // 600ms debounce
+    
+    return () => clearTimeout(timeoutId);
+  }, [query, value]);
 
   // Close on outside click
   useEffect(() => {

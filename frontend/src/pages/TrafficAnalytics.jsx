@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { getTrafficStats } from "../api";
+import { getTrafficStats, getCamerasAggregate } from "../api";
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -14,6 +14,7 @@ import {
 import { motion } from "framer-motion";
 import { BarChart2, TrendingDown, Zap } from "lucide-react";
 
+// Peak hours chart — indicative typical daily pattern (reference, not real-time)
 const PEAK_HOURS = [
   { hour: "06:00", density: 35 }, { hour: "07:00", density: 72 }, { hour: "08:00", density: 91 },
   { hour: "09:00", density: 88 }, { hour: "10:00", density: 62 }, { hour: "11:00", density: 55 },
@@ -23,12 +24,13 @@ const PEAK_HOURS = [
   { hour: "21:00", density: 45 }, { hour: "22:00", density: 30 }, { hour: "23:00", density: 18 },
 ];
 
-const VEHICLE_DIST = [
-  { name: "Cars",   value: 55, color: "#3b82f6" },
-  { name: "Bikes",  value: 22, color: "#8b5cf6" },
-  { name: "Trucks", value: 14, color: "#f97316" },
-  { name: "Bus",    value: 9,  color: "#10b981" },
-];
+// Color config per vehicle class
+const CLASS_COLORS = {
+  car:        "#3b82f6",
+  motorcycle: "#8b5cf6",
+  truck:      "#f97316",
+  bus:        "#10b981",
+};
 
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -45,10 +47,12 @@ const ChartTooltip = ({ active, payload, label }) => {
 };
 
 export default function TrafficAnalytics() {
-  const [history, setHistory] = useState([]);
+  const [history, setHistory]       = useState([]);
+  const [aggregate, setAggregate]   = useState(null);
 
+  // Poll single-camera global stats for time-series charts
   useEffect(() => {
-    const fetch = async () => {
+    const fetchStats = async () => {
       try {
         const stats = await getTrafficStats();
         if (stats.metrics && Object.keys(stats.metrics).length > 0) {
@@ -61,16 +65,42 @@ export default function TrafficAnalytics() {
               score: +(m.congestion_score || 0).toFixed(3),
               flow:  m.traffic_flow_vpm || 0,
             };
-            const next = [...prev, point];
-            return next.slice(-40);
+            return [...prev, point].slice(-40);
           });
         }
       } catch {}
     };
-    fetch();
-    const id = setInterval(fetch, 2000);
+    fetchStats();
+    const id = setInterval(fetchStats, 2000);
     return () => clearInterval(id);
   }, []);
+
+  // Poll aggregate (all cameras) for vehicle class distribution
+  useEffect(() => {
+    const fetchAgg = async () => {
+      try {
+        const agg = await getCamerasAggregate();
+        setAggregate(agg);
+      } catch {}
+    };
+    fetchAgg();
+    const id2 = setInterval(fetchAgg, 3000);
+    return () => clearInterval(id2);
+  }, []);
+
+  // Build real vehicle distribution from YOLO11 class_counts
+  const cc = aggregate?.class_counts || {};
+  const totalClassCount = (cc.car ?? 0) + (cc.truck ?? 0) + (cc.bus ?? 0) + (cc.motorcycle ?? 0);
+  const hasClassData = aggregate?.active_camera_count > 0 && totalClassCount > 0;
+
+  const vehicleDist = hasClassData
+    ? [
+        { name: "Cars",   value: cc.car        ?? 0, color: CLASS_COLORS.car        },
+        { name: "Bikes",  value: cc.motorcycle  ?? 0, color: CLASS_COLORS.motorcycle },
+        { name: "Trucks", value: cc.truck       ?? 0, color: CLASS_COLORS.truck      },
+        { name: "Bus",    value: cc.bus         ?? 0, color: CLASS_COLORS.bus        },
+      ]
+    : null;  // null = no data yet
 
   const latestScore = history.at(-1)?.score ?? 0;
   const latestCount = history.at(-1)?.count ?? 0;
@@ -166,38 +196,55 @@ export default function TrafficAnalytics() {
           </div>
         </motion.div>
 
-        {/* Vehicle Distribution Pie */}
+        {/* Vehicle Distribution Pie — REAL class_counts from YOLO11 */}
         <motion.div className="glass-card flex flex-col" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
-          <h3 style={{ margin: 0, color: "var(--text-primary)", fontWeight: 700, marginBottom: "1rem" }}>Vehicle Distribution</h3>
-          <div style={{ flex: 1, minHeight: 160 }}>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={VEHICLE_DIST} cx="50%" cy="50%" innerRadius={45} outerRadius={72} paddingAngle={3} dataKey="value">
-                  {VEHICLE_DIST.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => [`${v}%`, ""]} contentStyle={{ background: "var(--bg-card)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <h3 style={{ margin: 0, color: "var(--text-primary)", fontWeight: 700, marginBottom: "0.5rem" }}>Vehicle Distribution</h3>
+          <div className="text-xs text-muted mb-3" style={{ opacity: 0.7 }}>
+            {hasClassData ? "Live counts from YOLO11 detection" : "NO DATA — Start cameras to see real distribution"}
           </div>
-          <div className="flex flex-col gap-2 mt-2">
-            {VEHICLE_DIST.map((d) => (
-              <div key={d.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color }} />
-                  <span className="text-secondary">{d.name}</span>
-                </div>
-                <span className="font-mono font-bold" style={{ color: d.color }}>{d.value}%</span>
+          {vehicleDist ? (
+            <>
+              <div style={{ flex: 1, minHeight: 160 }}>
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={vehicleDist} cx="50%" cy="50%" innerRadius={45} outerRadius={72} paddingAngle={3} dataKey="value">
+                      {vehicleDist.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => [v, "vehicles"]} contentStyle={{ background: "var(--bg-card)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))}
-          </div>
+              <div className="flex flex-col gap-2 mt-2">
+                {vehicleDist.map((d) => (
+                  <div key={d.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: d.color }} />
+                      <span className="text-secondary">{d.name}</span>
+                    </div>
+                    <span className="font-mono font-bold" style={{ color: d.color }}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center flex-1" style={{ minHeight: 180 }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center", lineHeight: 1.6 }}>
+                NO DATA<br/>
+                <span style={{ fontSize: "0.65rem" }}>Start cameras on the Live Camera page</span>
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
-      {/* Peak Hours */}
+      {/* Peak Hours — reference chart clearly labeled */}
       <motion.div className="glass-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <h3 style={{ margin: 0, color: "var(--text-primary)", fontWeight: 700, marginBottom: "1rem" }}>Traffic Density by Hour</h3>
+        <div className="flex items-center justify-between" style={{ marginBottom: "1rem" }}>
+          <h3 style={{ margin: 0, color: "var(--text-primary)", fontWeight: 700 }}>Traffic Density by Hour</h3>
+          <span className="badge badge-ghost" style={{ fontSize: "0.65rem" }}>Typical Daily Pattern (Reference)</span>
+        </div>
         <div style={{ height: 180 }}>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={PEAK_HOURS} barCategoryGap="20%">

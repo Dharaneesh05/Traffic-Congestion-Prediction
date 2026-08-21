@@ -642,9 +642,13 @@ class RoutePlanner:
         self.config = config or RouteConfig()
         self._graph = None          # OSMnx MultiDiGraph
         self._node_coords: Dict[int, Tuple[float, float]] = {}
+        self._node_ids: List[int] = []          # sorted list for spatial index
+        self._node_lats: List[float] = []
+        self._node_lons: List[float] = []
         self._congestion_map: CongestionMap = CongestionMap()
         self._load_time_s: float = 0.0
         self._is_loaded: bool = False
+        self._load_error: Optional[str] = None  # stores graph load failure message
 
     # ── Graph loading ─────────────────────────────────────────────────────────
 
@@ -702,6 +706,7 @@ class RoutePlanner:
         node_count = len(self._graph.nodes)
         edge_count = len(self._graph.edges)
         self._is_loaded = True
+        self._load_error = None  # clear any previous error
 
         print("[RoutePlanner] Verify 1: Graph loads correctly (SUCCESS)")
         print("[RoutePlanner] Verify 3: Graph is not empty (SUCCESS)")
@@ -889,20 +894,36 @@ class RoutePlanner:
     def _extract_node_coords(self) -> None:
         """
         Pre-extract all node (lat, lon) pairs into a flat Python dict.
-
-        Why pre-extract?
-        ─────────────────
-        NetworkX node attribute access (graph.nodes[id]['y']) involves multiple
-        dict lookups per call. For a 100,000-node graph, calling this inside the
-        A* loop at every expansion adds up to millions of extra lookups.
-        Pre-extracting to a plain dict reduces that to a single O(1) dict lookup.
+        Also builds sorted lists for O(N) Haversine snap (or scipy KD-tree if available).
         """
         self._node_coords = {}
+        self._node_ids = []
+        self._node_lats = []
+        self._node_lons = []
         for node_id, attrs in self._graph.nodes(data=True):
             lat = attrs.get("y", None)
             lon = attrs.get("x", None)
             if lat is not None and lon is not None:
-                self._node_coords[int(node_id)] = (float(lat), float(lon))
+                nid = int(node_id)
+                self._node_coords[nid] = (float(lat), float(lon))
+                self._node_ids.append(nid)
+                self._node_lats.append(float(lat))
+                self._node_lons.append(float(lon))
+
+        # Try to build a scipy KD-tree for O(log N) nearest-node lookups
+        try:
+            import numpy as np
+            from scipy.spatial import cKDTree
+            # Convert lat/lon to approximate Cartesian (good enough for snapping)
+            lats = np.array(self._node_lats)
+            lons = np.array(self._node_lons)
+            self._kdtree = cKDTree(np.column_stack([lats, lons]))
+            self._kdtree_ids = list(self._node_ids)
+            print(f"[RoutePlanner] KD-tree built ({len(self._kdtree_ids):,} nodes) — fast snapping enabled")
+        except ImportError:
+            self._kdtree = None
+            self._kdtree_ids = None
+            print("[RoutePlanner] scipy not available — using O(N) Haversine snap")
 
     # ── Congestion injection ──────────────────────────────────────────────────
 
@@ -1019,6 +1040,13 @@ class RoutePlanner:
         if not self._node_coords:
             raise RuntimeError("[RoutePlanner] No node coordinates. Call load() first.")
 
+        # Fast path: use scipy KD-tree if built during load()
+        if getattr(self, "_kdtree", None) is not None:
+            import numpy as np
+            _, idx = self._kdtree.query([lat, lon])
+            return self._kdtree_ids[idx]
+
+        # Slow path: O(N) Haversine scan
         best_id   = -1
         best_dist = float("inf")
 
@@ -1281,19 +1309,22 @@ class RoutePlanner:
 
     def get_stats(self) -> dict:
         """
-        Return planner status dict for the FastAPI /api/route/status endpoint.
+        Return planner status dict for the FastAPI /api/routing-status endpoint.
         """
         return {
-            "is_loaded":           self._is_loaded,
-            "node_count":          len(self._graph.nodes) if self._graph else 0,
-            "edge_count":          len(self._graph.edges) if self._graph else 0,
-            "congestion_map_size": len(self._congestion_map),
-            "congestion_source":   self._congestion_map.source,
-            "osm_pbf_path":        self.config.osm_pbf_path,
-            "network_type":        self.config.network_type,
-            "congestion_penalty":  self.config.congestion_penalty,
-            "max_congestion_score":self.config.max_congestion_score,
-            "forecast_horizon":    self.config.forecast_horizon,
+            "is_loaded":            self._is_loaded,
+            "load_error":           self._load_error,
+            "node_count":           len(self._graph.nodes) if self._graph else 0,
+            "edge_count":           len(self._graph.edges) if self._graph else 0,
+            "congestion_map_size":  len(self._congestion_map),
+            "congestion_source":    self._congestion_map.source,
+            "osm_pbf_path":         self.config.osm_pbf_path,
+            "graph_cache_path":     self.config.graph_cache_path,
+            "network_type":         self.config.network_type,
+            "congestion_penalty":   self.config.congestion_penalty,
+            "max_congestion_score": self.config.max_congestion_score,
+            "forecast_horizon":     self.config.forecast_horizon,
+            "fast_snap":            getattr(self, "_kdtree", None) is not None,
         }
 
     def __repr__(self) -> str:

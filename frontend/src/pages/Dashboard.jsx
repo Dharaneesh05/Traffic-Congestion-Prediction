@@ -12,7 +12,7 @@ import {
   Activity, Car, Gauge, Wifi, TrendingUp,
   MapPin, AlertTriangle, Clock, Shield
 } from "lucide-react";
-import { getTrafficStats, getPrediction, getCameras, getCameraStats, getAgentReport } from "../api";
+import { getCamerasAggregate, getPrediction, getCameraStats, getAgentReport } from "../api";
 import CongestionBadge from "../components/CongestionBadge";
 import AIPanel from "../components/AIPanel";
 
@@ -121,23 +121,27 @@ const LocationStatusCard = ({ loc, index }) => {
 };
 
 export default function Dashboard() {
-  const [globalMetrics, setGlobalMetrics] = useState(null);
-  const [forecast, setForecast]           = useState(null);
+  const [aggregate, setAggregate] = useState(null);
+  const [forecast, setForecast]   = useState(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const load = async () => {
       try {
-        const [s, p] = await Promise.all([getTrafficStats(), getPrediction()]);
-        if (s.metrics) setGlobalMetrics(s.metrics);
+        const [agg, p] = await Promise.all([getCamerasAggregate(), getPrediction()]);
+        setAggregate(agg);
         if (p.forecast) setForecast(p.forecast);
       } catch {}
     };
-    fetch();
-    const id = setInterval(fetch, 3000);
+    load();
+    const id = setInterval(load, 3000);
     return () => clearInterval(id);
   }, []);
 
-  const m = globalMetrics || {};
+  // Network-wide totals from real aggregated camera data
+  const hasActiveCamera = (aggregate?.active_camera_count ?? 0) > 0;
+  const totalVehicles   = aggregate?.total_vehicles ?? null;
+  const avgSpeed        = aggregate?.avg_speed_kmh ?? null;
+  const avgScore        = aggregate?.avg_congestion_score ?? null;
 
   return (
     <div className="flex flex-col gap-6 fade-in">
@@ -153,33 +157,33 @@ export default function Dashboard() {
         <div className="text-sm text-muted mt-1">Real-time analysis powered by Agentic AI</div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards — real aggregated data from all running cameras */}
       <div className="grid grid-cols-4 gap-4">
         <KpiCard
           title="Congestion Score"
-          value={m.congestion_score != null ? `${(m.congestion_score * 100).toFixed(0)}%` : "—"}
-          subtitle="Composite real-time index"
+          value={hasActiveCamera ? `${((avgScore ?? 0) * 100).toFixed(0)}%` : "NO DATA"}
+          subtitle={hasActiveCamera ? `${aggregate.active_camera_count} camera${aggregate.active_camera_count > 1 ? 's' : ''} active` : "Start cameras to analyse"}
           icon={Activity}
           color="var(--accent-primary)"
         />
         <KpiCard
-          title="Active Vehicles"
-          value={m.vehicle_count ?? "—"}
-          subtitle="Tracked across cameras"
+          title="Total Vehicles"
+          value={hasActiveCamera ? (totalVehicles ?? "—") : "NO DATA"}
+          subtitle="Counted across all cameras"
           icon={Car}
           color="var(--accent-success)"
         />
         <KpiCard
           title="Average Speed"
-          value={m.average_speed_kmh != null ? `${m.average_speed_kmh.toFixed(0)} km/h` : "—"}
-          subtitle="Mean velocity across zones"
+          value={hasActiveCamera ? `${avgSpeed?.toFixed(0) ?? 0} km/h` : "NO DATA"}
+          subtitle="Mean velocity network-wide"
           icon={Gauge}
           color="var(--accent-warning)"
         />
         <KpiCard
           title="15-Min Forecast"
           value={forecast?.["15min"]?.level_q50?.replace("_", " ") || "—"}
-          subtitle={forecast?.["15min"]?.q50 != null ? `Confidence: ${(forecast["15min"].q50 * 100).toFixed(0)}%` : "TFT prediction"}
+          subtitle={forecast?.["15min"]?.q50 != null ? `Confidence: ${(forecast["15min"].q50 * 100).toFixed(0)}%` : "Waiting for data"}
           icon={TrendingUp}
           color="var(--accent-purple)"
         />
@@ -203,15 +207,17 @@ export default function Dashboard() {
             <LocationStatusCard key={loc.id} loc={loc} index={i} />
           ))}
 
-          {/* Camera Status Summary */}
+          {/* Camera Status Summary — real is_processing state from backend */}
           <div className="glass-card" style={{ padding: "1rem 1.25rem" }}>
             <div className="font-bold text-sm mb-4">Live Camera Status</div>
             <div className="grid grid-cols-4 gap-3">
-              {LOCATION_CARDS.map((cam) => (
+              {(aggregate?.per_camera ?? LOCATION_CARDS.map(l => ({ id: l.id, name: l.name, is_processing: false }))).map((cam) => (
                 <div key={cam.id} className="text-center p-3 rounded-md" style={{ background: "rgba(255,255,255,0.03)" }}>
                   <div className="flex items-center justify-center gap-1 mb-2">
-                    <Wifi size={12} color="var(--accent-success)" />
-                    <span className="text-xs font-bold text-success">Online</span>
+                    <Wifi size={12} color={cam.is_processing ? "var(--accent-success)" : "var(--text-muted)"} />
+                    <span className="text-xs font-bold" style={{ color: cam.is_processing ? "var(--accent-success)" : "var(--text-muted)" }}>
+                      {cam.is_processing ? "LIVE" : "Standby"}
+                    </span>
                   </div>
                   <div className="text-xs font-bold text-sm" style={{ color: "var(--text-primary)" }}>Cam {cam.id}</div>
                   <div className="text-xs text-muted mt-1" style={{ fontSize: "0.65rem" }}>{cam.name}</div>

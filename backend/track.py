@@ -160,6 +160,7 @@ class TrackedFrame:
     inference_time_ms: float
     active_track_ids: List[int]           # IDs confirmed active this frame
     trajectories: Dict[int, List[Tuple[float, float]]]  # {id: [(cx,cy),...]}
+    camera_id: Optional[str] = None
     frame: Optional[np.ndarray] = field(default=None, repr=False)
 
     # ── Convenience properties (mirrors detect.py FrameResult) ───────────────
@@ -182,6 +183,7 @@ class TrackedFrame:
         return {
             "frame_index": self.frame_index,
             "timestamp_ms": round(self.timestamp_ms, 2),
+            "camera_id": self.camera_id,
             "vehicle_count": self.vehicle_count,
             "class_counts": self.class_counts,
             "inference_time_ms": round(self.inference_time_ms, 2),
@@ -349,19 +351,15 @@ class Tracker:
         self._model.to(self.device)
 
         # Warmup: 3 silent tracking passes with a blank frame.
-        # We use persist=True during warmup too so ByteTrack initialises
-        # its internal state machine in tracking mode.
         dummy = np.zeros((self.img_size, self.img_size, 3), dtype=np.uint8)
         for _ in range(3):
             self._model.track(
                 dummy,
                 tracker=self.tracker_config,
-                persist=True,
+                persist=False,
                 verbose=False,
             )
 
-        # Reset after warmup so dummy frames don't pollute track history
-        self._model.reset_tracker()
         self._inference_times.clear()
         self._track_states.clear()
         self._frame_count = 0
@@ -390,6 +388,7 @@ class Tracker:
         frame: np.ndarray,
         frame_index: int,
         timestamp_ms: float,
+        camera_id: Optional[str],
         return_frame: bool,
     ) -> TrackedFrame:
         """
@@ -546,6 +545,7 @@ class Tracker:
             inference_time_ms=elapsed_ms,
             active_track_ids=active_ids,
             trajectories=trajectories,
+            camera_id=camera_id,
             frame=frame if return_frame else None,
         )
 
@@ -554,6 +554,8 @@ class Tracker:
     def track_frame(
         self,
         frame: np.ndarray,
+        camera_id: Optional[str] = None,
+        timestamp_ms: float = 0.0,
         return_frame: bool = False,
     ) -> TrackedFrame:
         """
@@ -578,7 +580,8 @@ class Tracker:
         return self._track_frame_internal(
             frame=frame,
             frame_index=self._frame_count,
-            timestamp_ms=0.0,
+            timestamp_ms=timestamp_ms,
+            camera_id=camera_id,
             return_frame=return_frame,
         )
 
@@ -679,6 +682,7 @@ class Tracker:
                     frame=frame,
                     frame_index=self._frame_count,
                     timestamp_ms=timestamp_ms,
+                    camera_id=None,
                     return_frame=return_frames,
                 )
 
@@ -809,11 +813,10 @@ class Tracker:
 
         Note: Does NOT reload the model weights. Call load() for that.
         """
-        if self._model is not None:
-            # Why reset_tracker()? persist=True keeps ByteTrack state across
-            # calls. reset_tracker() clears that internal state so the next
-            # call to model.track() starts fresh with ID=1.
-            self._model.reset_tracker()
+        if self._model is not None and hasattr(self._model, "predictor") and self._model.predictor is not None:
+            if hasattr(self._model.predictor, "trackers"):
+                for t in self._model.predictor.trackers:
+                    t.reset()
 
         self._track_states.clear()
         self._prev_active_ids.clear()

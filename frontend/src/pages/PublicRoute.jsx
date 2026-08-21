@@ -15,7 +15,7 @@ import {
   Navigation2, MapPin, Clock, AlertTriangle, ArrowRight,
   TrendingUp, Zap, RefreshCw, ChevronDown
 } from "lucide-react";
-import { getRouteByName, getTrafficStats, getPrediction } from "../api";
+import { getRouteByName, getTrafficStats, getPrediction, getRoutingStatus } from "../api";
 import LocationSearch from "../components/LocationSearch";
 import RouteCard from "../components/RouteCard";
 import CongestionBadge from "../components/CongestionBadge";
@@ -63,6 +63,38 @@ export default function PublicRoute() {
   const [activeRoute, setActiveRoute] = useState("forecast");
   const [liveStats, setLiveStats]     = useState(null);
   const [forecast, setForecast]       = useState(null);
+  const [routeStatus, setRouteStatus] = useState("initializing");
+  const [graphStats, setGraphStats]   = useState(null);  // {node_count, edge_count, network_type}
+  const [mapType, setMapType]         = useState("standard");
+  const statusPollRef = useRef(null);
+
+  // Fetch routing status — stop polling once graph is ready or errored
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await getRoutingStatus();
+        if (res.status === "error") {
+          setRouteStatus("error");
+          setError(`Road network failed to load: ${res.error}`);
+          clearInterval(statusPollRef.current);
+        } else if (res.status === "ready") {
+          setRouteStatus("ready");
+          setGraphStats({
+            node_count:   res.node_count   || 0,
+            edge_count:   res.edge_count   || 0,
+            network_type: res.network_type || "drive",
+            fast_snap:    res.fast_snap    || false,
+          });
+          clearInterval(statusPollRef.current);
+        } else {
+          setRouteStatus(res.status || "initializing");
+        }
+      } catch (e) { /* backend not yet up — keep polling */ }
+    };
+    fetchStatus();
+    statusPollRef.current = setInterval(fetchStatus, 3000);
+    return () => clearInterval(statusPollRef.current);
+  }, []);
 
   // Fetch live traffic stats for the congestion context
   useEffect(() => {
@@ -85,7 +117,7 @@ export default function PublicRoute() {
     setError("");
     setResult(null);
     try {
-      const data = await getRouteByName(from.name, to.name);
+      const data = await getRouteByName(from.name, to.name, from, to);
       setResult(data);
       setActiveRoute(data.recommendation || "forecast");
     } catch (e) {
@@ -176,11 +208,15 @@ export default function PublicRoute() {
         <button
           className="btn btn-primary btn-lg w-full"
           onClick={handleSearch}
-          disabled={loading || !from || !to}
+          disabled={loading || !from || !to || routeStatus === "initializing" || routeStatus === "error"}
           style={{ marginTop: "0.25rem" }}
         >
           {loading ? (
             <><div className="spinner" style={{ width: 16, height: 16, borderTopColor: "white" }} /> Finding Best Route...</>
+          ) : routeStatus === "initializing" ? (
+            <><div className="spinner" style={{ width: 16, height: 16, borderTopColor: "white" }} /> Preparing route service...</>
+          ) : routeStatus === "error" ? (
+            <><AlertTriangle size={16} /> Route service failed to load</>
           ) : (
             <><Zap size={16} /> Find Best Route</>
           )}
@@ -189,6 +225,32 @@ export default function PublicRoute() {
         {error && (
           <div className="text-xs text-danger p-3 rounded-md" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
             {error}
+          </div>
+        )}
+
+        {/* OSM Graph Status */}
+        {routeStatus === "ready" && graphStats && (
+          <div className="glass-card-flat" style={{ padding: "0.625rem 0.875rem" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted">Road Network</span>
+              <div className="flex items-center gap-1">
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent-success)" }} />
+                <span className="text-xs font-bold" style={{ color: "var(--accent-success)" }}>Loaded</span>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-1">
+              <span className="text-xs text-secondary">
+                <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>
+                  {(graphStats.node_count / 1000).toFixed(0)}k
+                </span> nodes
+              </span>
+              <span className="text-xs text-secondary">
+                <span className="font-mono font-bold" style={{ color: "var(--text-primary)" }}>
+                  {(graphStats.edge_count / 1000).toFixed(0)}k
+                </span> edges
+              </span>
+              <span className="text-xs text-secondary font-mono">{graphStats.network_type}</span>
+            </div>
           </div>
         )}
 
@@ -278,9 +340,32 @@ export default function PublicRoute() {
           zoomControl={false}
         >
           <TileLayer
-            attribution='&copy; <a href="https://carto.com">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution={mapType === "dark" ? '&copy; <a href="https://carto.com">CARTO</a>' : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}
+            url={mapType === "dark" ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"}
           />
+
+        {/* Map Type Toggle */}
+        <div style={{
+          position: "absolute", top: 12, right: 12,
+          display: "flex", gap: 4, zIndex: 400,
+          background: "rgba(8,10,14,0.75)", backdropFilter: "blur(8px)",
+          padding: 4, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)"
+        }}>
+          <button 
+            className="px-3 py-1 text-xs font-bold rounded-md transition-colors"
+            style={{ background: mapType === 'standard' ? 'var(--accent-primary)' : 'transparent', color: mapType === 'standard' ? 'white' : 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
+            onClick={() => setMapType('standard')}
+          >
+            Standard
+          </button>
+          <button 
+            className="px-3 py-1 text-xs font-bold rounded-md transition-colors"
+            style={{ background: mapType === 'dark' ? 'rgba(255,255,255,0.1)' : 'transparent', color: mapType === 'dark' ? 'white' : 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
+            onClick={() => setMapType('dark')}
+          >
+            Dark
+          </button>
+        </div>
 
           {/* Draw all routes with different opacity */}
           {result && allRoutes.map((strategy) => {

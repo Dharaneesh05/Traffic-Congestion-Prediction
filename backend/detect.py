@@ -153,6 +153,7 @@ class FrameResult:
     timestamp_ms: float
     detections: List[Detection]
     inference_time_ms: float
+    camera_id: Optional[str] = None
     frame: Optional[np.ndarray] = field(default=None, repr=False)
 
     @property
@@ -173,6 +174,7 @@ class FrameResult:
         return {
             "frame_index": self.frame_index,
             "timestamp_ms": round(self.timestamp_ms, 2),
+            "camera_id": self.camera_id,
             "vehicle_count": self.vehicle_count,
             "class_counts": self.class_counts,
             "inference_time_ms": round(self.inference_time_ms, 2),
@@ -423,6 +425,28 @@ class Detector:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
+    def detect(
+        self,
+        frame: np.ndarray,
+        frame_index: int = 0,
+        timestamp_ms: float = 0.0,
+        camera_id: Optional[str] = None,
+        return_frame: bool = False,
+    ) -> FrameResult:
+        """
+        Process a single raw BGR frame from memory.
+        """
+        self._require_loaded()
+        detections = self._infer(frame)
+        return FrameResult(
+            frame_index=frame_index,
+            timestamp_ms=timestamp_ms,
+            detections=detections,
+            inference_time_ms=self._inference_times[-1],
+            camera_id=camera_id,
+            frame=frame if return_frame else None,
+        )
+
     def detect_image(
         self,
         path: Union[str, Path],
@@ -547,6 +571,7 @@ class Detector:
         skip_frames: int = 0,
         max_frames: Optional[int] = None,
         return_frames: bool = False,
+        camera_id: Optional[str] = None,
     ) -> Generator[FrameResult, None, None]:
         """
         Generator that yields FrameResult for each frame of a video or webcam.
@@ -654,6 +679,7 @@ class Detector:
                     timestamp_ms=timestamp_ms,
                     detections=detections,
                     inference_time_ms=self._inference_times[-1],
+                    camera_id=camera_id,
                     frame=frame if return_frames else None,
                 )
 
