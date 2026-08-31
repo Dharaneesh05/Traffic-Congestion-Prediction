@@ -154,13 +154,20 @@ from __future__ import annotations
 
 import json
 import math
+import os
+import sys
 import time
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+
+# Ensure backend directory is in sys.path
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -168,6 +175,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # ──────────────────────────────────────────────────────────────────────────────
 # Constants
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 # Prediction horizons in minutes and their 0-based indices in the target array.
 # The TFT decoder predicts HORIZON_MAX steps; we extract specific ones.
@@ -644,7 +652,7 @@ class DataPreprocessor:
 # TFT Keras Layers
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _build_tft_model(config: TFTConfig) -> "tf.keras.Model":
+def _build_tft_model(config: TFTConfig) -> Any:
     """
     Build the Temporal Fusion Transformer using the Keras Functional API.
 
@@ -670,7 +678,8 @@ def _build_tft_model(config: TFTConfig) -> "tf.keras.Model":
     as key/value — this is the cross-attention step from the TFT paper.
     """
     import tensorflow as tf
-    from tensorflow.keras import layers, regularizers
+    from tensorflow.keras import layers
+
 
     units    = config.hidden_units
     d_rate   = config.dropout_rate
@@ -1108,7 +1117,6 @@ class CongestionPredictor:
         if self._model is None:
             raise RuntimeError("[Predictor] Model not built. Call build() or load().")
 
-        import tensorflow as tf
         preds = self._model(
             [encoder_X, decoder_D],
             training=False,

@@ -1,0 +1,13 @@
+{
+  "venvPath": "C:\\Users\\Dharanesh\\miniconda3\\envs",
+  "venv": "traffic_env",
+  "extraPaths": [
+    "./backend",
+    "./backend/ByteTrack",
+    "C:/Users/Dharanesh/miniconda3/envs/traffic_env/Lib/site-packages"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportAttributeAccessIssue": "none",
+  "typeCheckingMode": "off"
+}

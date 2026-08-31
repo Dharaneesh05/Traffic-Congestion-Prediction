@@ -116,18 +116,19 @@ print("✅ To install, uncomment the loop above and re-run.")
 print("   Or run: pip install -r requirements.txt")
 
 # Core imports used throughout the notebook
-import os, sys, json, time, math, random, warnings
+import os, sys, json, time, random, warnings
 from pathlib import Path
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
-from typing import List, Tuple, Dict, Optional, Any
+from typing import List, Tuple, Dict, Optional
 from enum import Enum
 
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from IPython.display import display, Image as IPImage, HTML, clear_output
+from IPython.display import HTML
+
 
 # Notebook display helpers
 warnings.filterwarnings("ignore")
@@ -474,16 +475,19 @@ class FasterRCNNDetector:
         self._inference_times = []
 
     @staticmethod
-    def _cuda_ok():
-        try: import torch; return torch.cuda.is_available()
-        except: return False
+    def _cuda_ok() -> bool:
+        try:
+            import torch
+            return torch.cuda.is_available()
+        except Exception:
+            return False
+
 
     def load(self):
         import torch
         from torchvision.models.detection import (
             fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
         )
-        from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
         if self._weights_path and Path(self._weights_path).exists():
             model = fasterrcnn_resnet50_fpn_v2(weights=None, num_classes=self._num_classes)
@@ -499,7 +503,6 @@ class FasterRCNNDetector:
     @classmethod
     def build_for_finetuning(cls, num_classes=5, device="cuda"):
         """Build model with replaced head for fine-tuning."""
-        import torch
         from torchvision.models.detection import (fasterrcnn_resnet50_fpn_v2,
                                                    FasterRCNN_ResNet50_FPN_V2_Weights)
         from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -510,9 +513,12 @@ class FasterRCNNDetector:
         inst._model = model.to(device)
         return inst
 
+
     def detect(self, frame):
-        if self._model is None: raise RuntimeError("Call .load() first")
+        if self._model is None:
+            raise RuntimeError("Call .load() first")
         import torch
+
         t0 = time.perf_counter()
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         tensor = torch.from_numpy(rgb).float().permute(2,0,1)/255.0

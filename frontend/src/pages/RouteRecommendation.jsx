@@ -51,18 +51,18 @@ const QUICK_ROUTES = [
 ];
 
 export default function RouteRecommendation() {
-  const [from, setFrom]       = useState(null);
-  const [to, setTo]           = useState(null);
+  const [from, setFrom]       = useState({ name: "Salem Bus Stand" });
+  const [to, setTo]           = useState({ name: "Erode Bus Stand" });
   const [result, setResult]   = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState("");
   const [active, setActive]   = useState("forecast");
 
-  const handleSearch = async () => {
-    if (!from || !to) { setError("Select both origin and destination."); return; }
-    setLoading(true); setError(""); setResult(null);
+  const runRouteSearch = async (originName, destName) => {
+    if (!originName || !destName) return;
+    setLoading(true); setError("");
     try {
-      const data = await getRouteByName(from.name, to.name);
+      const data = await getRouteByName(originName, destName);
       setResult(data);
       setActive(data.recommendation || "forecast");
     } catch (e) {
@@ -72,8 +72,19 @@ export default function RouteRecommendation() {
     }
   };
 
+  useEffect(() => {
+    runRouteSearch("Salem Bus Stand", "Erode Bus Stand");
+  }, []);
+
+  const handleSearch = () => {
+    if (!from || !to) { setError("Select both origin and destination."); return; }
+    runRouteSearch(from.name, to.name);
+  };
+
   const handleQuick = (r) => {
-    setFrom({ name: r.from }); setTo({ name: r.to });
+    setFrom({ name: r.from });
+    setTo({ name: r.to });
+    runRouteSearch(r.from, r.to);
   };
 
   const activeData  = result?.[active];

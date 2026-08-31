@@ -19,3 +19,5 @@ langchain-core
 langchain-openai
 pyrosm
 tensorflow>=2.10
+lap
+flake8

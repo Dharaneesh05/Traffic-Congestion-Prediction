@@ -49,6 +49,9 @@ Usage:
 
 from __future__ import annotations
 
+import os
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import sys
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -57,12 +60,24 @@ from typing import Dict, Generator, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
+try:
+    import torch
+    torch.set_num_threads(1)
+except Exception:
+    pass
+
+# Ensure backend directory is in sys.path
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 # ── Import shared types from detect.py ────────────────────────────────────────
-# We import Detection and CLASS_NAMES so track.py output is directly compatible
-# with counter.py, traffic_analysis.py, and every downstream consumer.
-# detect.py is NOT modified — only its public API is consumed here.
-from detect import CLASS_NAMES, CLASS_COLORS, Detection, _COCO_TO_PROJECT
+try:
+    from detect import CLASS_NAMES, Detection, _COCO_TO_PROJECT
+except ImportError:
+    from backend.detect import CLASS_NAMES, Detection, _COCO_TO_PROJECT
+
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -428,16 +443,14 @@ class Tracker:
         """
         t0 = time.perf_counter()
 
-        # ── Run YOLO11 detection + ByteTrack in one GPU call ─────────────────
-        results = self._model.track(
+        # ── Run YOLO11 inference ─────────────────────────────────────────────
+        results = self._model.predict(
             frame,
             conf=self.conf,
             iou=self.iou_threshold,
             imgsz=self.img_size,
             max_det=self.max_det,
-            tracker=self.tracker_config,
-            persist=True,    # ← CRITICAL: maintains ByteTrack state between frames
-            verbose=False,   # ← suppress per-frame YOLO console output
+            verbose=False,
         )
 
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -451,76 +464,65 @@ class Tracker:
 
         if result is not None and result.boxes is not None:
             boxes = result.boxes
+            bboxes_raw  = boxes.xyxy.cpu().numpy()        # (N, 4)
+            confs_raw   = boxes.conf.cpu().numpy()        # (N,)
+            classes_raw = boxes.cls.cpu().numpy().astype(int)  # (N,)
 
-            # Why check boxes.id separately?
-            # On the very first frame, ByteTrack has not yet confirmed any
-            # tracks (they start in "tentative" state). boxes.id will be None
-            # until at least one track is confirmed (typically after 3 hits).
-            # We must guard against this to avoid AttributeError.
-            if boxes.id is not None:
-                track_ids_raw  = boxes.id.cpu().numpy().astype(int)
-                bboxes_raw     = boxes.xyxy.cpu().numpy()        # (N, 4)
-                confs_raw      = boxes.conf.cpu().numpy()        # (N,)
-                classes_raw    = boxes.cls.cpu().numpy().astype(int)  # (N,)
+            for bbox, conf_val, coco_cls in zip(bboxes_raw, confs_raw, classes_raw):
+                # ── COCO class filtering ──────────────────────────────────
+                if self.custom_trained:
+                    if coco_cls >= len(CLASS_NAMES):
+                        continue
+                    class_id = coco_cls
+                else:
+                    if coco_cls not in _COCO_TO_PROJECT:
+                        continue
+                    class_id = _COCO_TO_PROJECT[coco_cls]
 
-                for track_id, bbox, conf_val, coco_cls in zip(
-                    track_ids_raw, bboxes_raw, confs_raw, classes_raw
-                ):
-                    track_id = int(track_id)
+                x1, y1, x2, y2 = bbox.tolist()
+                cx = (x1 + x2) / 2.0
+                cy = (y1 + y2) / 2.0
 
-                    # ── COCO class filtering ──────────────────────────────────
-                    # Same logic as detect.py _infer():
-                    #   custom_trained → class IDs are already 0–5 for our set
-                    #   pretrained     → COCO IDs must be mapped to project IDs
-                    if self.custom_trained:
-                        if coco_cls >= len(CLASS_NAMES):
-                            continue  # ignore unsupported classes
-                        class_id = coco_cls
-                    else:
-                        if coco_cls not in _COCO_TO_PROJECT:
-                            continue  # not a vehicle class (e.g., person, sign)
-                        class_id = _COCO_TO_PROJECT[coco_cls]
+                # ── Match with existing active tracks (Centroid / Spatial Matching) ──
+                best_id = None
+                best_dist = 60.0  # max spatial distance in pixels
+                for tid, state in self._track_states.items():
+                    if state.is_active and state.trajectory:
+                        last_pt = state.trajectory[-1]
+                        dist = ((cx - last_pt[0]) ** 2 + (cy - last_pt[1]) ** 2) ** 0.5
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_id = tid
 
-                    x1, y1, x2, y2 = bbox.tolist()
-                    cx = (x1 + x2) / 2.0
-                    cy = (y1 + y2) / 2.0
-
-                    # ── Update or create TrackState ───────────────────────────
-                    # Why maintain TrackState separately from Detection?
-                    # Detection is stateless (one frame snapshot). TrackState
-                    # is the persistent record that accumulates trajectory history
-                    # and metadata across the entire session.
-                    if track_id not in self._track_states:
-                        # New track confirmed by ByteTrack
-                        self._track_states[track_id] = TrackState(
-                            track_id=track_id,
-                            class_id=class_id,
-                            class_name=CLASS_NAMES[class_id],
-                            trajectory=deque(maxlen=self.max_trajectory_len),
-                            first_seen=frame_index,
-                            last_seen=frame_index,
-                            total_hits=0,
-                            is_active=True,
-                        )
-
-                    self._track_states[track_id].update(cx, cy, frame_index)
-
-                    # Build the Detection object that the pipeline expects
-                    detections.append(Detection(
-                        bbox=(x1, y1, x2, y2),
-                        confidence=float(conf_val),
+                if best_id is None:
+                    # New confirmed track ID
+                    if not hasattr(self, "_next_track_id"):
+                        self._next_track_id = 1
+                    best_id = self._next_track_id
+                    self._next_track_id += 1
+                    self._track_states[best_id] = TrackState(
+                        track_id=best_id,
                         class_id=class_id,
                         class_name=CLASS_NAMES[class_id],
-                        track_id=track_id,   # ← ByteTrack permanent ID
-                    ))
-                    active_ids.append(track_id)
+                        trajectory=deque(maxlen=self.max_trajectory_len),
+                        first_seen=frame_index,
+                        last_seen=frame_index,
+                        total_hits=0,
+                        is_active=True,
+                    )
+
+                self._track_states[best_id].update(cx, cy, frame_index)
+                active_ids.append(best_id)
+
+                detections.append(Detection(
+                    bbox=(x1, y1, x2, y2),
+                    confidence=float(conf_val),
+                    class_id=class_id,
+                    class_name=CLASS_NAMES[class_id],
+                    track_id=best_id,
+                ))
 
         # ── Mark previously-active tracks that disappeared as inactive ────────
-        # Why do this explicitly?
-        # ByteTrack removes tracks after track_buffer frames (typically 30).
-        # Between disappearance and removal, a track is "lost" but still in
-        # ByteTrack's internal state. We mark is_active=False immediately when
-        # a track is no longer returned, so queries to _track_states are accurate.
         current_active_set = set(active_ids)
         for tid in self._prev_active_ids - current_active_set:
             if tid in self._track_states:
@@ -528,10 +530,6 @@ class Tracker:
         self._prev_active_ids = current_active_set
 
         # ── Build trajectory snapshot for this frame ──────────────────────────
-        # Why only active tracks?
-        # Sending all trajectories (including lost ones) per frame would be
-        # wasteful for WebSocket streaming. The full history is always available
-        # via get_trajectory() / get_all_trajectories() on demand.
         trajectories: Dict[int, List[Tuple[float, float]]] = {
             tid: self._track_states[tid].trajectory_list
             for tid in active_ids

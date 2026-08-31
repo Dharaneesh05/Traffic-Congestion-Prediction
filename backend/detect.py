@@ -37,6 +37,8 @@ Usage:
 
 from __future__ import annotations
 
+import os
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,6 +46,12 @@ from typing import Generator, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
+
+# Ensure backend directory is in sys.path
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -258,10 +266,18 @@ class Detector:
         # this file's parent (backend/) so the path is always correct
         # regardless of the caller's working directory.
         if weights is None:
-            # Default: go up from backend/ to project root, find yolo11n.pt
-            self.weights = Path(__file__).resolve().parent.parent / "yolo11n.pt"
+            candidate = Path(__file__).resolve().parent.parent / "yolo11n.pt"
+            if not candidate.exists():
+                candidate = Path(__file__).resolve().parent / "yolo11n.pt"
+            self.weights = candidate
         else:
-            self.weights = Path(weights).resolve()
+            p = Path(weights)
+            if not p.is_absolute() and not p.exists():
+                backend_p = Path(__file__).resolve().parent / p.name
+                if backend_p.exists():
+                    p = backend_p
+            self.weights = p.resolve()
+
 
         self.conf = conf
         self.iou_threshold = iou

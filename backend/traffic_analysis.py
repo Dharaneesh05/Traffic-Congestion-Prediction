@@ -57,15 +57,24 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
+import os
+import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
+# Ensure backend directory is in sys.path
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
 # ── Shared types ───────────────────────────────────────────────────────────────
-# traffic_analysis.py imports from detect.py only.
-# It accepts List[Detection] (from detect.py OR track.py — they return the same type).
-# counter.py CrossingEvent is imported for flow calculation.
-from detect import CLASS_NAMES, Detection
-from counter import CrossingEvent
+try:
+    from detect import CLASS_NAMES, Detection
+    from counter import CrossingEvent
+except ImportError:
+    from backend.detect import CLASS_NAMES, Detection
+    from backend.counter import CrossingEvent
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────

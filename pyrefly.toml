@@ -1,0 +1,22 @@
+# Pyrefly Configuration
+preset = "basic"
+python-interpreter-path = "C:/Users/Dharanesh/miniconda3/envs/traffic_env/python.exe"
+
+search-paths = [
+    "./backend",
+    "./backend/ByteTrack",
+    "C:/Users/Dharanesh/miniconda3/envs/traffic_env/Lib/site-packages"
+]
+
+[errors]
+missing-import = false
+unbound-name = false
+
+project-excludes = [
+    ".git/**",
+    ".vscode/**",
+    ".ruff_cache/**",
+    "**/__pycache__/**",
+    "frontend/**",
+    "datasets/**"
+]

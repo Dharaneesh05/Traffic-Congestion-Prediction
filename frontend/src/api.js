@@ -125,3 +125,33 @@ export const getAgentReport = async () =>
 export const getCamerasAggregate = async () =>
   get(`${API_BASE}/cameras/aggregate`);
 
+/** Get 4-approach junction status overview and active diversion plans */
+export const getJunctionOverview = async (junction = "Sankagiri Junction") =>
+  get(`${API_BASE}/junction/overview?junction=${encodeURIComponent(junction)}`);
+
+/** Calculate on-demand authority diversion plan */
+export const calculateDiversion = async (junctionName = "Sankagiri Junction", approachId = null, cameraId = null) =>
+  post(`${API_BASE}/diversion/calculate`, { junction_name: junctionName, approach_id: approachId, camera_id: cameraId });
+
+/** Fetch active & historical alerts */
+export const getAlerts = async () =>
+  get(`${API_BASE}/alerts`);
+
+/** Execute police officer field action on an urgent alert */
+export const sendOfficerAction = async (alertId, action, officerId = "OFFICER_TN_042", notes = "") =>
+  post(`${API_BASE}/alerts/${alertId}/action`, { action, officer_id: officerId, notes });
+
+/** Fetch immutable decision audit log */
+export const getAuditLog = async (limit = 50) =>
+  get(`${API_BASE}/audit-log?limit=${limit}`);
+
+/** Query Traffic Management Knowledge Base for SOPs and regulatory rules */
+export const queryRAGKnowledge = async (q, congestionScore = 0.5) =>
+  get(`${API_BASE}/rag/query?q=${encodeURIComponent(q)}&congestion_score=${congestionScore}`);
+
+/** Configure a camera source (IP camera stream URL, webcam index, or video) */
+export const configureCamera = async (camId, payload) =>
+  post(`${API_BASE}/camera/${camId}/configure`, payload);
+
+
+

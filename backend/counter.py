@@ -61,19 +61,25 @@ Usage:
 
 from __future__ import annotations
 
+import os
+import sys
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
 
-import numpy as np
+
+# Ensure backend directory is in sys.path
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 # ── Shared types from detect.py ───────────────────────────────────────────────
-# counter.py accepts Detection objects — the common currency of the pipeline.
-# We do NOT import from track.py to avoid a circular dependency.
-# Both detect.py (FrameResult.detections) and track.py (TrackedFrame.detections)
-# produce List[Detection], so counter.py works with both.
-from detect import CLASS_NAMES, Detection
+try:
+    from detect import CLASS_NAMES, Detection
+except ImportError:
+    from backend.detect import CLASS_NAMES, Detection
+
 
 
 # ──────────────────────────────────────────────────────────────────────────────
