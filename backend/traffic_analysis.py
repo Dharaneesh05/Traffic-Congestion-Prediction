@@ -155,7 +155,7 @@ class AnalysisConfig:
     road_area_m2:        float = _DEFAULT_ROAD_AREA_M2
     congested_threshold: int   = 50      # vehicles
     free_flow_speed_kmh: float = 60.0   # km/h
-    history_len:         int   = 3600   # frames
+    history_len:         int   = 100000 # frames (holds >55 minutes at 30 FPS, or multi-hour continuous CCTV simulation)
     flow_window_s:       float = 60.0   # seconds for flow rate window
     speed_smooth_n:      int   = 5      # frames for per-track speed smoothing
     export_path:         Optional[str] = None
@@ -375,6 +375,7 @@ class TrafficAnalyser:
         crossing_events:  Optional[List[CrossingEvent]] = None,
         frame_index:      int   = 0,
         timestamp_ms:     float = 0.0,
+        wall_time_s:      Optional[float] = None,
     ) -> FrameMetrics:
         """
         Compute all traffic metrics for one frame and store the result.
@@ -387,6 +388,7 @@ class TrafficAnalyser:
                 crossing_events = counter.update(tracked_frame.detections, ...),
                 frame_index     = tracked_frame.frame_index,
                 timestamp_ms    = tracked_frame.timestamp_ms,
+                wall_time_s     = continuous_time_s,
             )
 
         Args:
@@ -400,11 +402,12 @@ class TrafficAnalyser:
                               Pass None or [] if counter is not active.
             frame_index     : Sequential frame number from the video stream.
             timestamp_ms    : Stream position in milliseconds.
+            wall_time_s     : Continuous epoch wall time (seconds). If None, defaults to time.time().
 
         Returns:
             FrameMetrics with all six metrics computed and ready for JSON export.
         """
-        now = time.monotonic()
+        now = wall_time_s if wall_time_s is not None else time.time()
         self._frames_processed += 1
 
         # ── 1. Vehicle count ──────────────────────────────────────────────────

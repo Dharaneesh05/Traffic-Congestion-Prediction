@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MapPin, Search, X } from "lucide-react";
+import { searchLocations } from "../api";
 
 export default function LocationSearch({ placeholder, value, onChange, icon }) {
   const [query, setQuery] = useState(value?.name || "");
@@ -33,22 +34,36 @@ export default function LocationSearch({ placeholder, value, onChange, icon }) {
     const timeoutId = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&countrycodes=in`);
-        const data = await res.json();
-        
-        const results = data.map(item => ({
-          name: item.display_name,
+        // Query database location search API first
+        const dbRes = await searchLocations(query).catch(() => null);
+        const dbResults = (dbRes?.locations || []).map(item => ({
+          id: item.id || item.junction_id,
+          name: item.name,
           lat: parseFloat(item.lat),
-          lon: parseFloat(item.lon)
+          lon: parseFloat(item.lon),
+          source: item.source || "database"
         }));
-        
-        setFiltered(results);
+
+        if (dbResults.length > 0) {
+          setFiltered(dbResults);
+        } else {
+          // Fallback to Nominatim geocoding
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&countrycodes=in`);
+          const data = await res.json();
+          const results = data.map(item => ({
+            name: item.display_name,
+            lat: parseFloat(item.lat),
+            lon: parseFloat(item.lon),
+            source: "nominatim"
+          }));
+          setFiltered(results);
+        }
       } catch (err) {
         console.error("Geocoding failed:", err);
       } finally {
         setLoading(false);
       }
-    }, 600); // 600ms debounce
+    }, 350); // 350ms debounce
     
     return () => clearTimeout(timeoutId);
   }, [query, value]);

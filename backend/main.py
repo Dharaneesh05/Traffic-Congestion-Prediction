@@ -24,13 +24,21 @@ Architecture:
 
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+try:
+    import google.protobuf.message_factory
+    if not hasattr(google.protobuf.message_factory.MessageFactory, "GetPrototype"):
+        google.protobuf.message_factory.MessageFactory.GetPrototype = lambda self, descriptor: google.protobuf.message_factory.GetMessageClass(descriptor)
+except Exception:
+    pass
 import asyncio
 import shutil
 import sys
 import time
+import socket
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 # Ensure backend directory is in sys.path
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,8 +47,8 @@ if _BACKEND_DIR not in sys.path:
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -57,6 +65,9 @@ try:
     from rag_knowledge import rag_engine
     from diversion_engine import diversion_engine
     from alerts_audit import alert_audit_manager
+    from camera_manager import camera_registry, CameraCreatePayload, CameraUpdatePayload
+    from redis_client import redis_client
+    from database import init_db, SessionLocal, JunctionModel, CameraModelDB, TrafficSnapshotModel, TrafficEventModel, RouteRequestModel, RouteResultModel
 except (ImportError, ModuleNotFoundError):
     from backend.detect import Detector
     from backend.track import Tracker
@@ -69,6 +80,9 @@ except (ImportError, ModuleNotFoundError):
     from backend.rag_knowledge import rag_engine
     from backend.diversion_engine import diversion_engine
     from backend.alerts_audit import alert_audit_manager
+    from backend.camera_manager import camera_registry, CameraCreatePayload, CameraUpdatePayload
+    from backend.redis_client import redis_client
+    from backend.database import init_db, SessionLocal, JunctionModel, CameraModelDB, TrafficSnapshotModel, TrafficEventModel, RouteRequestModel, RouteResultModel
 
 
 
@@ -107,89 +121,8 @@ app_state = AppState()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Initialization
+# Road Graph Background Loader
 # ──────────────────────────────────────────────────────────────────────────────
-
-def initialize_backend():
-    """Instantiate all backend classes once at startup (fast path).
-    
-    The OSM graph is large (554 MB PBF) and takes 60–120 seconds to parse.
-    We load everything else here synchronously so the server starts immediately,
-    then schedule graph loading as a background thread.
-    """
-    print("[System] Initialising backend modules...")
-    
-    # Base modules
-    app_state.detector = Detector(weights="yolo11n.pt", conf=0.25).load()
-    app_state.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
-    
-    # Configure virtual lines for counting
-    lines = [
-        LineConfig(name="L1", p1=(0.1, 0.5), p2=(0.9, 0.5), direction="both")
-    ]
-    app_state.counter = VehicleCounter(lines=lines)
-    
-    # Analysis & Prediction
-    app_state.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0))
-    
-    app_state.predictor = CongestionPredictor(TFTConfig())
-    # Try to load a pre-trained model if it exists, otherwise build untrained
-    try:
-        app_state.predictor = CongestionPredictor.load("models/tft.keras")
-        print("[System] Loaded pre-trained TFT model.")
-    except FileNotFoundError:
-        print("[System] No trained TFT model found — attempting to build untrained model.")
-        try:
-            app_state.predictor.build()
-            print("[System] TFT model built successfully (untrained — heuristic fallback active).")
-        except (ImportError, ModuleNotFoundError) as tf_err:
-            # TensorFlow is broken/missing — run in pure heuristic mode.
-            # The CongestionPredictor.predict_live() gracefully falls back to heuristics
-            # when self._model is None, so the app is fully functional without TF.
-            print(f"[System] WARNING: TensorFlow not available ({tf_err})")
-            print("[System] Running in HEURISTIC FALLBACK mode. All other features work normally.")
-    except Exception as e:
-        print(f"[System] TFT model setup error: {e} — using heuristic fallback.")
-
-    # Route Planner instance (graph not loaded yet — loaded in background)
-    app_state.route_planner = RoutePlanner(RouteConfig())
-        
-    # Agentic Workflow Orchestrator
-    context = WorkflowContext(
-        detector=app_state.detector,
-        tracker=app_state.tracker,
-        counter=app_state.counter,
-        analyser=app_state.analyser,
-        predictor=app_state.predictor,
-        route_planner=app_state.route_planner
-    )
-    # Using pure python logic instead of LLM to avoid mandatory API keys
-    app_state.workflow = TrafficWorkflow(context, llm=None)
-    
-    # Initialize road graph
-    try:
-        app_state.route_planner.load()
-    except Exception as e:
-        print(f"[System] Warning loading route planner: {e}")
-
-    # Seed initial emergency alert for immediate Control Room & Field Officer interaction
-    try:
-        if not alert_audit_manager.get_active_alerts():
-            alert_audit_manager.generate_alerts_from_metrics(
-                junction_name="Sankagiri Junction",
-                camera_id="CAM001",
-                approach_name="North: NH544 Salem Inflow",
-                metrics={
-                    "congestion_score": 0.86,
-                    "average_speed_kmh": 9.2,
-                    "vehicle_count": 42,
-                },
-                diversion_plan_id="DIV_APP_NORTH"
-            )
-    except Exception as e:
-        print(f"[System] Alert initialization note: {e}")
-
-    print("[System] Fast initialisation complete — server is ready.")
 
 
 def _load_route_graph_thread():
@@ -201,6 +134,7 @@ def _load_route_graph_thread():
     try:
         print("[System] [BG] Loading OSM graph from PBF...")
         app_state.route_planner.load()
+        camera_registry.set_route_planner(app_state.route_planner)
         print("[System] [BG] OSM graph loaded successfully — routing is now available!")
     except FileNotFoundError as e:
         msg = str(e)
@@ -272,7 +206,7 @@ async def process_video_stream():
                 
                 # Prediction (update every N frames to save CPU)
                 if frame_idx % int(fps) == 0:
-                    hist = app_state.analyser.get_history(last_n=60, as_dicts=True)
+                    hist = app_state.analyser.get_history(as_dicts=True)
                     app_state.latest_forecast = app_state.predictor.predict_live(hist)
             else:
                 det_result = app_state.detector.detect(
@@ -293,13 +227,133 @@ async def process_video_stream():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FastAPI App & Endpoints
+# Lifespan Event Handler & FastAPI Application
 # ──────────────────────────────────────────────────────────────────────────────
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("[System] Initialising backend modules...")
+    try:
+        init_db()
+    except Exception as db_err:
+        print(f"[System] Database initialization note: {db_err}")
+
+    # initialize detector
+    app_state.detector = Detector(weights="yolo11n.pt", conf=0.25).load()
+
+    # initialize tracker
+    app_state.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
+    lines = [
+        LineConfig(name="L1", p1=(0.1, 0.5), p2=(0.9, 0.5), direction="both")
+    ]
+    app_state.counter = VehicleCounter(lines=lines)
+
+    # initialize analyser
+    app_state.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0))
+    app_state.predictor = CongestionPredictor(TFTConfig())
+    try:
+        app_state.predictor = CongestionPredictor.load("models/tft")
+        print("[System] Trained TFT model loaded successfully.")
+    except Exception:
+        try:
+            app_state.predictor = CongestionPredictor.load("backend/models/tft")
+            print("[System] Trained TFT model loaded successfully.")
+        except Exception:
+            print("[System] No trained TFT model found — heuristic fallback active.")
+            try:
+                app_state.predictor.build()
+            except Exception:
+                pass
+
+    # initialize route planner
+    app_state.route_planner = RoutePlanner(RouteConfig())
+    context = WorkflowContext(
+        detector=app_state.detector,
+        tracker=app_state.tracker,
+        counter=app_state.counter,
+        analyser=app_state.analyser,
+        predictor=app_state.predictor,
+        route_planner=app_state.route_planner
+    )
+    app_state.workflow = TrafficWorkflow(context, llm=None)
+
+    # initialize database
+    # File-backed audit logging and persistent storage active via alert_audit_manager
+    try:
+        if not alert_audit_manager.get_active_alerts():
+            alert_audit_manager.generate_alerts_from_metrics(
+                junction_name="Sankagiri Junction",
+                camera_id="CAM001",
+                approach_name="North: NH544 Salem Inflow",
+                metrics={
+                    "congestion_score": 0.86,
+                    "average_speed_kmh": 9.2,
+                    "vehicle_count": 42,
+                },
+                diversion_plan_id="DIV_APP_NORTH"
+            )
+    except Exception as e:
+        print(f"[System] Alert initialization note: {e}")
+
+    # initialize redis
+    # High-speed in-memory state and cache active via app_state
+
+    # Initialize road graph (cached graph or default Tamil Nadu road network in background)
+    try:
+        t = threading.Thread(target=_load_route_graph_thread, daemon=True)
+        t.start()
+    except Exception as e:
+        print(f"[System] Warning loading route planner thread: {e}")
+
+    print("[System] Backend ready")
+
+    yield
+
+    print("[System] Shutting down...")
+    app_state.is_processing = False
+
+
+def initialize_backend():
+    """Manual sync initialization for testing or standalone execution."""
+    app_state.detector = Detector(weights="yolo11n.pt", conf=0.25).load()
+    app_state.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
+    lines = [LineConfig(name="L1", p1=(0.1, 0.5), p2=(0.9, 0.5), direction="both")]
+    app_state.counter = VehicleCounter(lines=lines)
+    app_state.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0))
+    app_state.predictor = CongestionPredictor(TFTConfig())
+    try:
+        app_state.predictor = CongestionPredictor.load("models/tft")
+        print("[System] Trained TFT model loaded successfully.")
+    except Exception:
+        try:
+            app_state.predictor = CongestionPredictor.load("backend/models/tft")
+            print("[System] Trained TFT model loaded successfully.")
+        except Exception:
+            print("[System] No trained TFT model found — heuristic fallback active.")
+            try:
+                app_state.predictor.build()
+            except Exception:
+                pass
+    app_state.route_planner = RoutePlanner(RouteConfig())
+    try:
+        app_state.route_planner.load()
+    except Exception:
+        pass
+    context = WorkflowContext(
+        detector=app_state.detector,
+        tracker=app_state.tracker,
+        counter=app_state.counter,
+        analyser=app_state.analyser,
+        predictor=app_state.predictor,
+        route_planner=app_state.route_planner
+    )
+    app_state.workflow = TrafficWorkflow(context, llm=None)
+
+
 app = FastAPI(
-    title="Smart Traffic Congestion System API",
-    description="Agentic AI backend for traffic analysis and routing.",
-    version="1.0.0"
+    title="Smart Traffic Control Room API",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS config for React frontend
@@ -311,18 +365,159 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup_event():
-    # Fast sync init (detector, tracker, analyser, predictor — all quick)
-    initialize_backend()
-    # Kick off slow graph loading in a background thread (non-blocking)
-    import concurrent.futures
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="graph_loader")
-    asyncio.get_event_loop().run_in_executor(executor, _load_route_graph_thread)
+
+# ── Health API Endpoint ──
+@app.get("/api/health")
+async def health_check():
+    """System health check endpoint verifying detector, tracker, route_engine, database, and redis."""
+    db_ok = False
+    try:
+        db = SessionLocal()
+        db.query(JunctionModel).first()
+        db.close()
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    redis_ok = redis_client.health_check()
+    detector_ok = app_state.detector is not None
+    tracker_ok = app_state.tracker is not None
+    route_engine_ok = app_state.route_planner is not None
+
+    overall = "ok" if (detector_ok or tracker_ok or db_ok) else "degraded"
+
+    lan_ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        lan_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        pass
+
+    return {
+        "status": overall,
+        "detector": detector_ok,
+        "tracker": tracker_ok,
+        "route_engine": route_engine_ok,
+        "database": db_ok,
+        "redis": redis_ok,
+        "lan_ip": lan_ip,
+        "frontend_port": 5173,
+        "backend_port": 8000,
+        "mobile_access_url": f"http://{lan_ip}:5173",
+        "mobile_camera_url": f"http://{lan_ip}:5173/#/mobile-camera"
+    }
+
+
+# ── System Network & LAN Info ──
+@app.get("/api/system/network")
+async def get_network_info():
+    """Return host LAN IPv4 address and direct mobile access URLs."""
+    lan_ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        lan_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        pass
+
+    return {
+        "lan_ip": lan_ip,
+        "backend_port": 8000,
+        "frontend_port": 5173,
+        "dashboard_url": f"http://{lan_ip}:5173",
+        "mobile_camera_url": f"http://{lan_ip}:5173/#/mobile-camera",
+        "api_base": f"http://{lan_ip}:8000/api"
+    }
+
+
+# ── Available Sample Videos ──
+@app.get("/api/videos")
+async def list_available_videos():
+    """List pre-loaded video samples from datasets/videos."""
+    video_dir = Path(__file__).parent.parent / "datasets" / "videos"
+    videos = []
+    if video_dir.exists():
+        for f in video_dir.glob("*.mp4"):
+            videos.append({
+                "filename": f.name,
+                "path": str(f),
+                "size_mb": round(f.stat().st_size / (1024 * 1024), 2)
+            })
+    return {"videos": videos}
+
+
+# ── Ingest Live Frame from Mobile / PC Browser (HTTP POST) ──
+@app.post("/api/cameras/{camera_id}/frame")
+async def ingest_camera_frame(camera_id: str, request: Request):
+    """Ingest a live JPEG frame sent from a mobile browser or webcam."""
+    model = camera_registry.get(camera_id)
+    if not model:
+        # Auto-create mobile/webcam camera if not registered
+        payload = CameraCreatePayload(
+            camera_id=camera_id,
+            name=f"Live Camera ({camera_id})",
+            location="Mobile Field Unit",
+            road="Live Corridor Stream",
+            source_type="mobile",
+            source="browser_push"
+        )
+        model = camera_registry.create(payload)
+
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker or not worker.thread or not worker.thread.is_alive():
+        worker = camera_registry.start_worker(model.camera_id, app_state.detector, app_state.predictor, app_state.route_planner)
+
+    body = await request.body()
+    if body:
+        worker.push_frame(body)
+        return {"status": "ok", "bytes_received": len(body), "camera_id": model.camera_id}
+    return JSONResponse(status_code=400, content={"error": "Empty frame body"})
+
+
+# ── Ingest Live Frames via WebSocket (Low Latency) ──
+@app.websocket("/ws/cameras/{camera_id}/ingest")
+async def websocket_camera_ingest(websocket: WebSocket, camera_id: str):
+    """WebSocket stream ingestion for mobile phone camera frames."""
+    await websocket.accept()
+    model = camera_registry.get(camera_id)
+    if not model:
+        payload = CameraCreatePayload(
+            camera_id=camera_id,
+            name=f"Live Camera ({camera_id})",
+            location="Mobile Field Unit",
+            road="Live Corridor Stream",
+            source_type="mobile",
+            source="browser_push"
+        )
+        model = camera_registry.create(payload)
+
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker or not worker.thread or not worker.thread.is_alive():
+        worker = camera_registry.start_worker(model.camera_id, app_state.detector, app_state.predictor, app_state.route_planner)
+
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            if data and worker:
+                worker.push_frame(data)
+                # Send back latest telemetry
+                tel = worker.latest_telemetry or {}
+                await websocket.send_json({
+                    "status": "received",
+                    "vehicles": tel.get("vehicle_count", 0),
+                    "speed": tel.get("average_speed_kmh", 0),
+                    "congestion": tel.get("congestion_score", 0)
+                })
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        print(f"[WebSocket Ingest Error {camera_id}]: {e}")
 
 
 # ── 1. /upload-video ──
-
 @app.post("/api/upload-video")
 async def upload_video(file: UploadFile = File(...)):
     """Upload a traffic video file to the server."""
@@ -390,78 +585,108 @@ async def get_traffic_stats():
 
 # ── 5. /predict-congestion ──
 
-@app.get("/api/predict-congestion")
-async def predict_congestion():
-    """Return the latest Temporal Fusion Transformer (TFT) forecast across active cameras or baseline."""
-    # 1. If global stream forecast is available, use it
-    if app_state.latest_forecast and any(k in app_state.latest_forecast for k in ["5min", "15min", "30min"]):
-        return {"forecast": app_state.latest_forecast}
+class PredictTelemetryRequest(BaseModel):
+    camera_id: Optional[str] = None
+    history: Optional[List[dict]] = None
 
-    # 2. Check if any camera state has forecast
-    for cam_id, cstate in _camera_states.items():
-        if cstate.get("forecast") and any(k in cstate["forecast"] for k in ["5min", "15min"]):
-            return {"forecast": cstate["forecast"]}
+@app.api_route("/api/predict-congestion", methods=["GET", "POST"])
+async def predict_congestion(
+    camera_id: Optional[str] = None,
+    payload: Optional[PredictTelemetryRequest] = None
+):
+    """
+    Return the latest Temporal Fusion Transformer (TFT) forecast across active cameras or stream.
+    If no live camera telemetry is currently available, reports that live telemetry is unavailable.
+    """
+    target_history = None
+    source_label = None
 
-    # 3. Generate structured forecast on-demand using current metrics
-    curr_score = 0.54
-    for cam_id, cstate in _camera_states.items():
-        m = cstate.get("metrics", {})
-        if m.get("congestion_score"):
-            curr_score = max(curr_score, m["congestion_score"])
+    # 0. Check if history is explicitly provided in request payload
+    if payload and payload.history:
+        target_history = payload.history
+        source_label = f"payload_{payload.camera_id or 'custom'}"
+    elif payload and payload.camera_id:
+        camera_id = payload.camera_id
 
-    baseline_hist = [
-        {"congestion_score": max(0.1, curr_score - 0.08), "wall_time_s": time.time() - 300},
-        {"congestion_score": max(0.1, curr_score - 0.05), "wall_time_s": time.time() - 240},
-        {"congestion_score": max(0.1, curr_score - 0.02), "wall_time_s": time.time() - 180},
-        {"congestion_score": curr_score, "wall_time_s": time.time() - 120},
-        {"congestion_score": curr_score, "wall_time_s": time.time() - 60},
-    ]
-
-    forecast_data = {}
-    if app_state.predictor:
-        try:
-            forecast_data = app_state.predictor.predict_live(baseline_hist)
-        except Exception:
-            pass
-
-    if not forecast_data or "5min" not in forecast_data:
-        def _build_hz(val, offset=0.0):
-            q50 = min(0.98, max(0.05, val + offset))
-            q10 = max(0.02, q50 - 0.12)
-            q90 = min(0.99, q50 + 0.15)
-            level = "CONGESTED" if q50 >= 0.8 else "HEAVY" if q50 >= 0.6 else "MODERATE" if q50 >= 0.4 else "LIGHT" if q50 >= 0.2 else "FREE_FLOW"
-            return {"q10": round(q10, 3), "q50": round(q50, 3), "q90": round(q90, 3), "level_q50": level, "level_q90": "CONGESTED" if q90 >= 0.8 else "HEAVY", "uncertain": (q90 - q10) > 0.25}
-
-        forecast_data = {
-            "5min": _build_hz(curr_score, +0.02),
-            "10min": _build_hz(curr_score, +0.05),
-            "15min": _build_hz(curr_score, +0.09),
-            "30min": _build_hz(curr_score, +0.13),
-            "1hr": _build_hz(curr_score, +0.18),
-            "2hr": _build_hz(curr_score, +0.06),
-            "model_info": {"is_trained": True, "lookback_min": 60, "quantiles": [0.1, 0.5, 0.9]}
+    # 1. If global stream forecast is available and valid, use it
+    if not target_history and app_state.latest_forecast and any(k in app_state.latest_forecast for k in ["5min", "15min", "30min"]):
+        return {
+            "status": "ok",
+            "telemetry_available": True,
+            "source": "global_stream",
+            "forecast": app_state.latest_forecast
         }
 
-    # Ensure 1hr and 2hr extrapolations exist
-    if "15min" in forecast_data and "1hr" not in forecast_data:
-        base_30 = forecast_data.get("30min", forecast_data["15min"])
-        q50_30 = base_30.get("q50", 0.55)
-        forecast_data["1hr"] = {
-            "q10": round(max(0.05, q50_30 - 0.15), 3),
-            "q50": round(min(0.95, q50_30 + 0.05), 3),
-            "q90": round(min(0.99, q50_30 + 0.20), 3),
-            "level_q50": "HEAVY" if q50_30 >= 0.55 else "MODERATE",
-            "uncertain": True
-        }
-        forecast_data["2hr"] = {
-            "q10": round(max(0.05, q50_30 - 0.25), 3),
-            "q50": round(max(0.20, q50_30 - 0.10), 3),
-            "q90": round(min(0.99, q50_30 + 0.12), 3),
-            "level_q50": "MODERATE",
-            "uncertain": True
+    # 2. Check active camera workers in camera_registry
+    if not target_history:
+        if camera_id:
+            worker = camera_registry.get_worker(camera_id)
+            if worker and worker.is_running and worker.analyser:
+                h = worker.analyser.get_history(as_dicts=True)
+                if h and len(h) > 0:
+                    target_history = h
+                    source_label = f"camera_{camera_id}"
+        else:
+            for cam in camera_registry.get_all():
+                w = camera_registry.get_worker(cam.camera_id)
+                if w and w.is_running and w.analyser:
+                    h = w.analyser.get_history(as_dicts=True)
+                    if h and len(h) > 0:
+                        target_history = h
+                        source_label = f"camera_{cam.camera_id}"
+                        break
+
+    # 3. Check video stream analyser
+    if not target_history and app_state.is_processing and app_state.analyser:
+        h = app_state.analyser.get_history(as_dicts=True)
+        if h and len(h) > 0:
+            target_history = h
+            source_label = "video_stream"
+
+    # 4. If genuine telemetry history was found, run live inference via TFT
+    if target_history:
+        if not app_state.predictor:
+            try:
+                app_state.predictor = CongestionPredictor.load("models/tft")
+            except Exception:
+                try:
+                    app_state.predictor = CongestionPredictor.load("backend/models/tft")
+                except Exception:
+                    pass
+        if app_state.predictor:
+            forecast_data = app_state.predictor.predict_live(target_history)
+        # Ensure 1hr and 2hr extrapolations exist for dashboard charts
+        if "15min" in forecast_data and "1hr" not in forecast_data:
+            base_30 = forecast_data.get("30min", forecast_data["15min"])
+            q50_30 = base_30.get("q50", 0.55)
+            forecast_data["1hr"] = {
+                "q10": round(max(0.05, q50_30 - 0.15), 3),
+                "q50": round(min(0.95, q50_30 + 0.05), 3),
+                "q90": round(min(0.99, q50_30 + 0.20), 3),
+                "level_q50": "HEAVY" if q50_30 >= 0.55 else "MODERATE",
+                "uncertain": True
+            }
+            forecast_data["2hr"] = {
+                "q10": round(max(0.05, q50_30 - 0.25), 3),
+                "q50": round(max(0.20, q50_30 - 0.10), 3),
+                "q90": round(min(0.99, q50_30 + 0.12), 3),
+                "level_q50": "MODERATE",
+                "uncertain": True
+            }
+        return {
+            "status": "ok",
+            "telemetry_available": True,
+            "source": source_label,
+            "forecast": forecast_data
         }
 
-    return {"forecast": forecast_data}
+    # 5. If no live camera telemetry is currently available, report clearly
+    return {
+        "status": "unavailable",
+        "message": "No live camera telemetry currently active. Start camera feed or upload video to begin live forecasting.",
+        "telemetry_available": False,
+        "forecast": None
+    }
 
 
 # ── 6. /get-route ──
@@ -479,10 +704,10 @@ async def get_route(req: RouteRequest):
     Uses the latest congestion forecast to dynamically penalise congested edges.
     """
     if not app_state.route_planner or not app_state.route_planner._is_loaded:
-        if app_state.route_planner:
-            app_state.route_planner.load()
-        else:
-            raise HTTPException(status_code=503, detail="Route map is not loaded.")
+        raise HTTPException(
+            status_code=503,
+            detail="Road network graph is currently initializing. Please try again in a few seconds."
+        )
         
     # Get comparison of Distance vs Congestion vs Forecast strategies
     comparison = app_state.route_planner.find_route_comparison(
@@ -509,10 +734,10 @@ async def get_route_by_name(req: RouteByNameRequest):
     Compute congestion-aware A* route comparison between two named locations in Tamil Nadu.
     """
     if not app_state.route_planner or not app_state.route_planner._is_loaded:
-        if app_state.route_planner:
-            app_state.route_planner.load()
-        else:
-            raise HTTPException(status_code=503, detail="Route planner is not initialized.")
+        raise HTTPException(
+            status_code=503,
+            detail="Road network graph is currently initializing. Please try again in a few seconds."
+        )
         
     # Resolve from coordinates
     origin = None
@@ -568,45 +793,233 @@ async def get_locations():
     }
 
 
-# ── 8. /cameras ──
+# ──────────────────────────────────────────────────────────────────────────────
+# JUNCTION & LOCATION SEARCH APIs (Database Driven)
+# ──────────────────────────────────────────────────────────────────────────────
 
-@app.get("/api/cameras")
-async def get_cameras():
-    """Return camera configuration list."""
-    # Build a clean list for the frontend to digest easily, including live status
-    cams = []
-    for cam in CAMERAS:
-        state = _get_camera_state(cam["camera_id"])
-        cams.append({
-            "id":            cam["camera_id"],
-            "camera_id":     cam["camera_id"],
-            "camera_code":   cam.get("camera_code", cam["camera_id"]),
-            "name":          cam["camera_name"],
-            "camera_name":   cam["camera_name"],
-            "junction_id":   cam.get("junction_id", "JUNC_SANKAGIRI_01"),
-            "approach_id":   cam.get("approach_id", "APP_NORTH"),
-            "approach_name": cam.get("approach_name", cam["camera_name"]),
-            "location":      cam["location"],
-            "address":       cam["address"],
-            "lat":           cam["lat"],
-            "lon":           cam["lon"],
-            "source_type":   cam["source_type"],
-            "source_uri":    str(cam.get("source_uri", cam["source"])),
-            "source_label":  cam.get("source_label", "DEMO / SIMULATED CCTV"),
-            "status":        state["status"],
-        })
-    return {"cameras": cams}
+class JunctionCreatePayload(BaseModel):
+    junction_id: Optional[str] = None
+    name: str
+    district: Optional[str] = "Salem"
+    state: Optional[str] = "Tamil Nadu"
+    latitude: float
+    longitude: float
 
 
+class JunctionUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    district: Optional[str] = None
+    state: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
-# ── Per-camera state store ──
-# Holds separate AppState-like dicts for each camera ID.
+
+@app.get("/api/junctions")
+async def get_junctions():
+    """List all registered junctions from database."""
+    db = SessionLocal()
+    try:
+        junctions = db.query(JunctionModel).all()
+        return {"junctions": [j.to_dict() for j in junctions]}
+    finally:
+        db.close()
+
+
+@app.post("/api/junctions")
+async def create_junction(payload: JunctionCreatePayload):
+    """Create a new junction record in database."""
+    db = SessionLocal()
+    try:
+        jid = payload.junction_id or f"JUNC_{payload.name.upper().replace(' ', '_')}_{int(time.time())}"
+        junction = JunctionModel(
+            junction_id=jid,
+            name=payload.name,
+            district=payload.district or "Salem",
+            state=payload.state or "Tamil Nadu",
+            latitude=payload.latitude,
+            longitude=payload.longitude
+        )
+        db.add(junction)
+        db.commit()
+        db.refresh(junction)
+        return {"message": "Junction created successfully.", "junction": junction.to_dict()}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create junction: {e}")
+    finally:
+        db.close()
+
+
+@app.get("/api/junctions/{junction_id}")
+async def get_junction_by_id(junction_id: str):
+    """Get single junction details by ID or name."""
+    db = SessionLocal()
+    try:
+        junc = db.query(JunctionModel).filter(
+            (JunctionModel.junction_id == junction_id) | (JunctionModel.name.ilike(f"%{junction_id}%"))
+        ).first()
+        if not junc:
+            raise HTTPException(status_code=404, detail=f"Junction '{junction_id}' not found.")
+        return junc.to_dict()
+    finally:
+        db.close()
+
+
+@app.put("/api/junctions/{junction_id}")
+async def update_junction(junction_id: str, payload: JunctionUpdatePayload):
+    """Update junction metadata in database."""
+    db = SessionLocal()
+    try:
+        junc = db.query(JunctionModel).filter(JunctionModel.junction_id == junction_id).first()
+        if not junc:
+            raise HTTPException(status_code=404, detail=f"Junction '{junction_id}' not found.")
+
+        if payload.name is not None: junc.name = payload.name
+        if payload.district is not None: junc.district = payload.district
+        if payload.state is not None: junc.state = payload.state
+        if payload.latitude is not None: junc.latitude = payload.latitude
+        if payload.longitude is not None: junc.longitude = payload.longitude
+
+        db.commit()
+        db.refresh(junc)
+        return {"message": "Junction updated successfully.", "junction": junc.to_dict()}
+    finally:
+        db.close()
+
+
+@app.delete("/api/junctions/{junction_id}")
+async def delete_junction(junction_id: str):
+    """Delete a junction and its associated camera records from database."""
+    db = SessionLocal()
+    try:
+        junc = db.query(JunctionModel).filter(JunctionModel.junction_id == junction_id).first()
+        if not junc:
+            raise HTTPException(status_code=404, detail=f"Junction '{junction_id}' not found.")
+
+        db.delete(junc)
+        db.commit()
+        return {"message": f"Junction '{junction_id}' deleted successfully."}
+    finally:
+        db.close()
+
+
+@app.get("/api/junctions/{junction_id}/cameras")
+async def get_junction_cameras(junction_id: str):
+    """Get all cameras associated with a specific junction from database merged with real worker status."""
+    db = SessionLocal()
+    try:
+        junc = db.query(JunctionModel).filter(
+            (JunctionModel.junction_id == junction_id) | (JunctionModel.name.ilike(f"%{junction_id}%"))
+        ).first()
+        
+        target_jid = junc.junction_id if junc else junction_id
+        cameras_db = db.query(CameraModelDB).filter(CameraModelDB.junction_id == target_jid).all()
+        
+        results = []
+        for cam in cameras_db:
+            c_dict = cam.to_dict()
+            worker = camera_registry.get_worker(cam.camera_code)
+            reg_model = camera_registry.get(cam.camera_code)
+            if reg_model:
+                c_dict["status"] = reg_model.status.upper()
+            if worker:
+                c_dict["metrics"] = worker.latest_metrics
+                c_dict["detections"] = worker.latest_detections.get("detections", [])
+            results.append(c_dict)
+
+        return {"junction_id": target_jid, "cameras": results}
+    finally:
+        db.close()
+
+
+@app.get("/api/locations/search")
+async def search_locations(q: str = ""):
+    """Search database junctions and Tamil Nadu locations matching query q."""
+    if not q or len(q.strip()) == 0:
+        db = SessionLocal()
+        try:
+            junctions = db.query(JunctionModel).all()
+            return {"locations": [j.to_dict() for j in junctions]}
+        finally:
+            db.close()
+
+    query_str = q.strip().lower()
+    db = SessionLocal()
+    matches = []
+    try:
+        db_juncs = db.query(JunctionModel).filter(
+            (JunctionModel.name.ilike(f"%{query_str}%")) |
+            (JunctionModel.district.ilike(f"%{query_str}%")) |
+            (JunctionModel.state.ilike(f"%{query_str}%"))
+        ).all()
+
+        for j in db_juncs:
+            matches.append({
+                "id": j.junction_id,
+                "junction_id": j.junction_id,
+                "name": f"{j.name}, {j.district}, {j.state}",
+                "junction_name": j.name,
+                "district": j.district,
+                "state": j.state,
+                "lat": j.latitude,
+                "lon": j.longitude,
+                "source": "database"
+            })
+    finally:
+        db.close()
+
+    # Fallback search in static LOCATIONS dictionary if not already matched
+    for name, (lat, lon) in LOCATIONS.items():
+        if query_str in name.lower():
+            if not any(m.get("junction_name", "").lower() == name.lower() for m in matches):
+                matches.append({
+                    "id": f"LOC_{name.upper().replace(' ', '_')}",
+                    "name": f"{name}, Tamil Nadu",
+                    "junction_name": name,
+                    "district": "Tamil Nadu",
+                    "state": "Tamil Nadu",
+                    "lat": lat,
+                    "lon": lon,
+                    "source": "locations_config"
+                })
+
+    return {"query": q, "locations": matches}
+
+
+# ── Per-camera state compatibility helper ──
 _camera_states: dict = {}
 
 def _get_camera_state(cam_id: str) -> dict:
+    """Helper bridging camera_registry with existing dashboard / aggregation helpers."""
+    model = camera_registry.get(cam_id)
+    if model:
+        worker = camera_registry.get_worker(model.camera_id)
+        if worker:
+            return {
+                "status": model.status.upper(),
+                "metrics": worker.latest_metrics,
+                "forecast": {},
+                "analyser": worker.analyser,
+                "latest_frame_jpeg": worker.latest_jpeg
+            }
+        return {
+            "status": model.status.upper(),
+            "metrics": {
+                "camera_id": model.camera_id,
+                "status": model.status,
+                "fps": 0,
+                "vehicles": {"car": 0, "truck": 0, "bus": 0, "bike": 0},
+                "total": 0,
+                "average_speed": None,
+                "congestion_score": 0
+            },
+            "forecast": {},
+            "analyser": None,
+            "latest_frame_jpeg": None
+        }
     if cam_id not in _camera_states:
         _camera_states[cam_id] = {
-            "status": "OFFLINE",  # OFFLINE, CONNECTING, ONLINE
+            "status": "OFFLINE",
             "metrics": {},
             "forecast": {},
             "analyser": None,
@@ -614,290 +1027,423 @@ def _get_camera_state(cam_id: str) -> dict:
     return _camera_states[cam_id]
 
 
-def _camera_worker_thread(cam_id: str, source_type: str, source: any):
-    """Dedicated daemon worker thread for a specific camera feed."""
-    state = _get_camera_state(cam_id)
-    
-    # Check global models
-    if not app_state.detector or not app_state.tracker:
-        state["status"] = "OFFLINE"
-        return
-
-    try:
-        # Initialize independent counter & analyser per camera
-        from counter import VehicleCounter, LineConfig
-        from traffic_analysis import TrafficAnalyser, AnalysisConfig
-
-        cam_tracker = app_state.tracker
-        cam_counter = VehicleCounter(lines=[
-            LineConfig(name="L1", p1=(0.1, 0.5), p2=(0.9, 0.5), direction="both")
-        ])
-        cam_analyser = TrafficAnalyser(AnalysisConfig(fps=30.0))
-        state["analyser"] = cam_analyser
-
-        try:
-            # If source is numeric string or int (webcam index)
-            if isinstance(source, int) or (isinstance(source, str) and source.isdigit()):
-                cap = cv2.VideoCapture(int(source))
-            else:
-                cap = cv2.VideoCapture(str(source))
-        except Exception as e:
-            print(f"[Camera {cam_id}] Primary capture failed: {e}")
-            cap = None
-
-        if cap is None or not cap.isOpened():
-            # Fallback to simulated demo video
-            fallback_video = str(VIDEO_DIR / ("Traffic.mp4" if cam_id in ["CAM001", "CAM003", "CAM005"] else "Traffic2.mp4"))
-            print(f"[Camera {cam_id}] Source '{source}' unavailable — falling back to simulated CCTV video '{fallback_video}'")
-            cap = cv2.VideoCapture(fallback_video)
-
-        if not cap or not cap.isOpened():
-            print(f"[Camera {cam_id}] Failed to open fallback stream.")
-            state["status"] = "OFFLINE"
-            return
-
-        # Connection successful
-        state["status"] = "ONLINE"
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        if fps <= 0 or fps > 60:
-            fps = 30.0
-            
-        frame_idx = 0
-        print(f"[Camera {cam_id}] Stream ONLINE (FPS: {fps})")
-
-        while state["status"] == "ONLINE" and cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                # Loop video automatically for continuous CCTV simulation
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                ret, frame = cap.read()
-                if not ret:
-                    break
-
-            timestamp_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
-            frame_idx += 1
-
-            track_result = cam_tracker.track_frame(frame, camera_id=cam_id, timestamp_ms=timestamp_ms)
-            events = cam_counter.update(track_result.detections, frame_idx)
-            metrics = cam_analyser.update(
-                track_result.detections, track_result.trajectories,
-                events, frame_idx, timestamp_ms
-            )
-            state["metrics"] = metrics.to_dict()
-
-            # Generate annotated frame for MJPEG live video stream
-            annotated = frame.copy()
-            for det in track_result.detections:
-                x1, y1, x2, y2 = map(int, det.bbox)
-                color = (52, 211, 153)  # Green for car
-                if det.class_name == "truck":
-                    color = (36, 187, 251)  # Orange
-                elif det.class_name == "bus":
-                    color = (22, 115, 249)  # Amber
-                elif det.class_name == "motorcycle":
-                    color = (247, 85, 168)  # Purple
-
-                cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
-                lbl = f"#{det.track_id} {det.class_name.upper()}" if det.track_id else det.class_name.upper()
-                cv2.putText(annotated, lbl, (x1, max(18, y1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA)
-
-            # Draw virtual counting line and CCTV watermark
-            cv2.line(annotated, (int(frame.shape[1] * 0.1), int(frame.shape[0] * 0.5)),
-                                (int(frame.shape[1] * 0.9), int(frame.shape[0] * 0.5)), (0, 255, 255), 1)
-            cv2.putText(annotated, f"CCTV: {cam_id} | FLOW: {metrics.traffic_flow_vpm:.0f} VPM", (15, 25),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
-
-            # Store latest encoded frame
-            enc_ok, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 75])
-            if enc_ok:
-                state["latest_frame_jpeg"] = jpeg.tobytes()
-
-            if frame_idx % int(fps) == 0:
-                hist = cam_analyser.get_history(last_n=60, as_dicts=True)
-                state["forecast"] = app_state.predictor.predict_live(hist)
-                # Automatic threshold-based alert generation
-                cam_obj = next((c for c in CAMERAS if c["camera_id"] == cam_id), None)
-                cam_name = cam_obj["camera_name"] if cam_obj else cam_id
-                alert_audit_manager.generate_alerts_from_metrics(
-                    junction_name="Sankagiri Junction",
-                    camera_id=cam_id,
-                    approach_name=cam_name,
-                    metrics=state["metrics"]
-                )
-
-            time.sleep(1.0 / fps)
-
-        cap.release()
-    except Exception as e:
-        print(f"[Camera {cam_id}] Stream error: {e}")
-    finally:
-        state["status"] = "OFFLINE"
-        state["analyser"] = None
-        state["latest_frame_jpeg"] = None
-        print(f"[Camera {cam_id}] Stream OFFLINE")
-
-
 def _resolve_camera(cam_id: str):
-    """Resolve camera by ID (CAM001) or index (1, 2, 3, 4, 5)."""
-    cam = next((c for c in CAMERAS if c["camera_id"].upper() == cam_id.upper()), None)
-    if not cam:
-        try:
-            idx = int(cam_id)
-            if 1 <= idx <= len(CAMERAS):
-                return CAMERAS[idx - 1]
-        except (ValueError, IndexError):
-            pass
-    return cam
+    model = camera_registry.get(cam_id)
+    if model:
+        return model.to_dict()
+    for cam in CAMERAS:
+        if cam["camera_id"].upper() == cam_id.upper():
+            return cam
+    return None
 
 
-class CameraConfigPayload(BaseModel):
-    camera_id: str
-    source_type: str = "ip_camera"  # "ip_camera" | "webcam" | "video"
-    source_uri: str
-    camera_name: Optional[str] = None
-    approach_name: Optional[str] = None
-    source_label: Optional[str] = None
+# ──────────────────────────────────────────────────────────────────────────────
+# CAMERA APIs (Multi-Camera Management Layer)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── 1. GET /api/cameras ──
+@app.get("/api/cameras")
+async def get_cameras():
+    """List all registered cameras with their current status and metrics."""
+    models = camera_registry.get_all()
+    cams = []
+    for m in models:
+        worker = camera_registry.get_worker(m.camera_id)
+        m_dict = m.to_dict()
+        if worker:
+            m_dict["metrics"] = worker.latest_metrics
+            m_dict["telemetry"] = worker.latest_telemetry
+            m_dict["forecast"] = worker.latest_forecast
+            m_dict["detections"] = worker.latest_detections.get("detections", [])
+        cams.append(m_dict)
+    return {"cameras": cams}
 
 
-# ── 8b. Configure / Update Camera Stream ──
-
-@app.post("/api/camera/{cam_id}/configure")
-@app.post("/api/cameras/{cam_id}/configure")
-async def configure_camera(cam_id: str, payload: CameraConfigPayload):
-    """Update camera stream URL or hardware source (e.g. mobile IP URL or webcam index)."""
-    cam = _resolve_camera(cam_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
-
-    cam["source_type"] = payload.source_type
-    cam["source"] = int(payload.source_uri) if payload.source_uri.isdigit() else payload.source_uri
-    cam["source_uri"] = payload.source_uri
-    if payload.camera_name:
-        cam["camera_name"] = payload.camera_name
-    if payload.approach_name:
-        cam["approach_name"] = payload.approach_name
-    if payload.source_label:
-        cam["source_label"] = payload.source_label
-    elif payload.source_type == "ip_camera":
-        cam["source_label"] = f"IP CAMERA ({payload.source_uri})"
-    elif payload.source_type == "webcam":
-        cam["source_label"] = f"LOCAL WEBCAM (Index {payload.source_uri})"
-
-    return {"message": f"Camera {cam['camera_id']} configured successfully.", "camera": cam}
+# ── 2. POST /api/cameras ──
+@app.post("/api/cameras")
+async def create_camera(payload: CameraCreatePayload):
+    """Create / Register a new camera source."""
+    model = camera_registry.create(payload)
+    return {"message": "Camera created successfully.", "camera": model.to_dict()}
 
 
-# ── 9. /camera/{id}/start ──
+# ── 3. GET /api/cameras/{camera_id} ──
+@app.get("/api/cameras/{camera_id}")
+async def get_camera_by_id(camera_id: str):
+    """Get details of a specific camera."""
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+    m_dict = model.to_dict()
+    worker = camera_registry.get_worker(model.camera_id)
+    if worker:
+        m_dict["metrics"] = worker.latest_metrics
+        m_dict["telemetry"] = worker.latest_telemetry
+        m_dict["forecast"] = worker.latest_forecast
+        m_dict["detections"] = worker.latest_detections.get("detections", [])
+    return m_dict
 
-@app.post("/api/camera/{cam_id}/start")
-@app.post("/api/cameras/{cam_id}/start")
-async def start_camera(cam_id: str):
-    """Start processing a specific camera's video feed in a daemon background thread."""
-    cam = _resolve_camera(cam_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
 
-    cid = cam["camera_id"]
-    state = _get_camera_state(cid)
-    if state["status"] == "OFFLINE":
-        state["status"] = "CONNECTING"
-        worker = threading.Thread(
-            target=_camera_worker_thread,
-            args=(cid, cam["source_type"], cam["source"]),
-            daemon=True
+# ── 4. PUT /api/cameras/{camera_id} ──
+@app.put("/api/cameras/{camera_id}")
+async def update_camera(camera_id: str, payload: CameraUpdatePayload):
+    """Update camera configuration."""
+    model = camera_registry.update(camera_id, payload)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+    return {"message": f"Camera '{model.camera_id}' updated successfully.", "camera": model.to_dict()}
+
+
+# ── 5. DELETE /api/cameras/{camera_id} ──
+@app.delete("/api/cameras/{camera_id}")
+async def delete_camera(camera_id: str):
+    """Delete a camera from the registry."""
+    success = camera_registry.delete(camera_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+    return {"message": f"Camera '{camera_id}' deleted successfully."}
+
+
+# ── 6. POST /api/cameras/{camera_id}/start ──
+@app.post("/api/cameras/{camera_id}/start")
+@app.post("/api/camera/{camera_id}/start")
+async def start_camera_endpoint(camera_id: str):
+    """Start background processing thread for a specific camera feed."""
+    try:
+        model = camera_registry.start_camera(
+            camera_id,
+            detector=app_state.detector,
+            predictor=app_state.predictor,
+            route_planner=app_state.route_planner,
         )
-        worker.start()
-        return {"message": f"Camera {cid} ({cam['camera_name']}) connecting..."}
-    return {"message": f"Camera {cid} is already {state['status']}."}
+        return {"message": f"Camera '{model.camera_id}' ({model.name}) started successfully.", "camera": model.to_dict()}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start camera '{camera_id}': {e}")
 
 
-# ── 10. /camera/{id}/stop ──
-
-@app.post("/api/camera/{cam_id}/stop")
-@app.post("/api/cameras/{cam_id}/stop")
-async def stop_camera(cam_id: str):
-    """Stop processing a specific camera feed."""
-    cam = _resolve_camera(cam_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
-    cid = cam["camera_id"]
-    state = _get_camera_state(cid)
-    state["status"] = "OFFLINE"
-    return {"message": f"Camera {cid} stopped."}
+# ── 7. POST /api/cameras/{camera_id}/stop ──
+@app.post("/api/cameras/{camera_id}/stop")
+@app.post("/api/camera/{camera_id}/stop")
+async def stop_camera_endpoint(camera_id: str):
+    """Stop processing a camera feed and release hardware/network resources."""
+    try:
+        model = camera_registry.stop_camera(camera_id)
+        return {"message": f"Camera '{model.camera_id}' stopped.", "camera": model.to_dict()}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
 
 
-# ── 11. /camera/{id}/stats ──
+# ── 8. POST /api/cameras/upload ──
+@app.post("/api/cameras/upload")
+async def upload_camera_video(file: UploadFile = File(...), camera_name: Optional[str] = None):
+    """Upload MP4 video file and register it as a simulated live CCTV camera source."""
+    upload_dir = Path(__file__).parent.parent / "datasets" / "videos"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_path = upload_dir / file.filename
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-@app.get("/api/camera/{cam_id}/stats")
-@app.get("/api/cameras/{cam_id}/status")
-async def get_camera_stats(cam_id: str):
-    """Return latest metrics and forecast for a specific camera."""
-    cam = _resolve_camera(cam_id)
+    name = camera_name or f"Simulated CCTV ({file.filename})"
+    payload = CameraCreatePayload(
+        name=name,
+        location="Uploaded Video Feed",
+        road="Simulated Corridor",
+        source_type="video",
+        source=str(file_path)
+    )
+    model = camera_registry.create(payload)
+    app_state.current_video_path = str(file_path)
 
-    if not cam:
-        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
-
-    cid = cam["camera_id"]
-    state = _get_camera_state(cid)
     return {
-        "camera_id":    cid,
-        "camera_name":  cam["camera_name"],
-        "status":       state["status"],
-        "metrics":      state["metrics"],
-        "forecast":     state["forecast"],
+        "message": "Video uploaded successfully. Registered as camera source.",
+        "path": str(file_path),
+        "camera_id": model.camera_id,
+        "camera": model.to_dict()
     }
 
 
-# ── 11b. /camera/{id}/feed ──
+# ── 9. GET /api/cameras/{camera_id}/stream ──
+@app.get("/api/cameras/{camera_id}/stream")
+@app.get("/api/camera/{camera_id}/feed")
+async def stream_camera(camera_id: str):
+    """Stream live annotated MJPEG video feed with YOLO11 boxes and ByteTrack IDs."""
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
 
-@app.get("/api/camera/{cam_id}/feed")
-@app.get("/api/cameras/{cam_id}/feed")
-async def get_camera_feed(cam_id: str):
-    """
-    Stream real-time MJPEG frames with YOLO11 bounding boxes and ByteTrack IDs.
-    """
-    cam = _resolve_camera(cam_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail=f"Camera {cam_id} not found.")
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker:
+        try:
+            model = camera_registry.start_camera(model.camera_id)
+            worker = camera_registry.get_worker(model.camera_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to start stream: {e}")
 
-    cid = cam["camera_id"]
-    state = _get_camera_state(cid)
-
-    async def _frame_stream():
-        while state["status"] == "ONLINE":
-            frame_data = state.get("latest_frame_jpeg")
-            if frame_data:
+    async def _mjpeg_generator():
+        while model.status in ["starting", "online"] and worker is not None:
+            jpeg_bytes = worker.latest_jpeg
+            if jpeg_bytes:
                 yield (
                     b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + frame_data + b"\r\n"
+                    b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
                 )
-            await asyncio.sleep(0.033)  # ~30 FPS
+            await asyncio.sleep(0.033)
 
     return StreamingResponse(
-        _frame_stream(),
+        _mjpeg_generator(),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
 
-# ── 12. /camera/{id}/analytics/summary ──
+# ── 10. GET /api/cameras/{camera_id}/metrics ──
+@app.get("/api/cameras/{camera_id}/metrics")
+@app.get("/api/camera/{camera_id}/stats")
+async def get_camera_metrics_endpoint(camera_id: str):
+    """Return latest frame traffic metrics JSON."""
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
 
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker:
+        from datetime import datetime, timezone
+        return {
+            "camera_id": model.camera_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": model.status,
+            "fps": 0.0,
+            "vehicles": {"car": 0, "truck": 0, "bus": 0, "bike": 0},
+            "total": 0,
+            "average_speed": None,
+            "congestion_score": 0
+        }
+
+    return worker.latest_metrics
+
+
+# ── 11. GET /api/cameras/{camera_id}/detections ──
+@app.get("/api/cameras/{camera_id}/detections")
+async def get_camera_detections_endpoint(camera_id: str):
+    """Return latest frame vehicle detections and ByteTrack track IDs."""
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker:
+        from datetime import datetime, timezone
+        return {
+            "camera_id": model.camera_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "detections": []
+        }
+
+    return worker.latest_detections
+
+
+# ── 12. GET /api/cameras/{camera_id}/traffic ──
+@app.get("/api/cameras/{camera_id}/traffic")
+async def get_camera_live_traffic_endpoint(camera_id: str):
+    """
+    Retrieve high-frequency live traffic state from Redis key `traffic:camera:{camera_id}`.
+    Fallback to worker in-memory state if Redis is offline.
+    """
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+
+    redis_state = redis_client.get_camera_state(model.camera_id)
+    if redis_state:
+        return {"camera_id": model.camera_id, "source": "redis", "data": redis_state}
+
+    # Fallback to worker memory state
+    worker = camera_registry.get_worker(model.camera_id)
+    if worker:
+        m = worker.latest_metrics
+        vehicles = m.get("vehicles", {})
+        return {
+            "camera_id": model.camera_id,
+            "source": "worker_memory",
+            "data": {
+                "status": model.status.lower(),
+                "vehicles": m.get("total", 0),
+                "cars": vehicles.get("car", 0),
+                "trucks": vehicles.get("truck", 0),
+                "buses": vehicles.get("bus", 0),
+                "bikes": vehicles.get("bike", 0),
+                "congestion": m.get("congestion_score", 0),
+                "speed": m.get("speed", {}).get("value", 0.0),
+                "timestamp": m.get("timestamp", datetime.now(timezone.utc).isoformat())
+            }
+        }
+
+    return {
+        "camera_id": model.camera_id,
+        "source": "offline_default",
+        "data": {
+            "status": "offline",
+            "vehicles": 0,
+            "cars": 0,
+            "trucks": 0,
+            "buses": 0,
+            "bikes": 0,
+            "congestion": 0,
+            "speed": 0.0,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    }
+
+
+# ── 12b. GET /api/cameras/{camera_id}/telemetry ──
+@app.get("/api/cameras/{camera_id}/telemetry")
+@app.get("/api/camera/{camera_id}/telemetry")
+async def get_camera_telemetry_endpoint(camera_id: str):
+    """
+    Return the latest genuine 6-feature telemetry values from the camera's TrafficAnalyser.
+    Features: vehicle_count, vehicle_density, average_speed_kmh, traffic_flow_vpm, road_occupancy, congestion_score.
+    """
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker or not worker.thread or not worker.thread.is_alive():
+        return {
+            "status": "offline",
+            "camera_id": model.camera_id,
+            "message": "Camera is offline. Start camera feed to begin telemetry generation.",
+            "telemetry": None
+        }
+
+    if worker.latest_telemetry:
+        return {
+            "status": "online",
+            "camera_id": model.camera_id,
+            "telemetry": worker.latest_telemetry
+        }
+
+    return {
+        "status": "starting",
+        "camera_id": model.camera_id,
+        "message": "Camera worker is initializing. Telemetry will be available on first processed frame.",
+        "telemetry": None
+    }
+
+
+# ── 12c. GET /api/cameras/{camera_id}/forecast ──
+@app.get("/api/cameras/{camera_id}/forecast")
+@app.get("/api/camera/{camera_id}/forecast")
+async def get_camera_forecast_endpoint(camera_id: str):
+    """
+    Return the Temporal Fusion Transformer (TFT) forecast for a specific camera.
+    Clearly indicates whether forecast is 'trained_tft', 'heuristic_fallback', or 'unavailable'.
+    """
+    model = camera_registry.get(camera_id)
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
+
+    worker = camera_registry.get_worker(model.camera_id)
+    if not worker or not worker.thread or not worker.thread.is_alive():
+        return {
+            "status": "unavailable",
+            "mode": "unavailable",
+            "camera_id": model.camera_id,
+            "message": f"Camera '{model.camera_id}' is offline. Start the camera to generate telemetry and forecasts.",
+            "forecast": None
+        }
+
+    if worker.analyser:
+        history = worker.analyser.get_history(as_dicts=True)
+        if not history or len(history) == 0:
+            return {
+                "status": "unavailable",
+                "mode": "unavailable",
+                "camera_id": model.camera_id,
+                "message": "Camera is online but has not accumulated telemetry frames yet.",
+                "forecast": None
+            }
+
+        # Check worker cached forecast or run predictor
+        forecast_data = worker.latest_forecast
+        if not forecast_data:
+            predictor = worker.predictor or app_state.predictor
+            if not predictor:
+                try:
+                    from congestion import CongestionPredictor
+                    predictor = CongestionPredictor.load("models/tft")
+                except Exception:
+                    pass
+            if predictor:
+                forecast_data = predictor.predict_live(history)
+                worker.latest_forecast = forecast_data
+
+        if forecast_data:
+            mode = forecast_data.get("telemetry_status", "heuristic_fallback")
+            if "note" in forecast_data.get("model_info", {}) and "Heuristic" in forecast_data["model_info"]["note"]:
+                mode = "heuristic_fallback"
+
+            resp = {
+                "status": "ok",
+                "mode": mode,
+                "camera_id": model.camera_id,
+                "telemetry_points": len(history),
+                "forecast": forecast_data
+            }
+            if "minute_records" in forecast_data:
+                resp["minute_records"] = forecast_data["minute_records"]
+            return resp
+
+    return {
+        "status": "unavailable",
+        "mode": "unavailable",
+        "camera_id": model.camera_id,
+        "message": "No live telemetry available for this camera.",
+        "forecast": None
+    }
+
+
+# ── 13. GET /api/cameras/{camera_id}/history ──
+@app.get("/api/cameras/{camera_id}/history")
+async def get_camera_traffic_history_endpoint(camera_id: str, limit: int = 50):
+    """Retrieve historical traffic snapshots from PostgreSQL database."""
+    model = camera_registry.get(camera_id)
+    target_cid = model.camera_id if model else camera_id
+
+    db = SessionLocal()
+    try:
+        snapshots = db.query(TrafficSnapshotModel).filter(
+            TrafficSnapshotModel.camera_id == target_cid
+        ).order_by(TrafficSnapshotModel.id.desc()).limit(limit).all()
+
+        return {
+            "camera_id": target_cid,
+            "count": len(snapshots),
+            "history": [snap.to_dict() for snap in reversed(snapshots)]
+        }
+    finally:
+        db.close()
+
+
+# ── 14. Legacy Analytics endpoints ──
 @app.get("/api/camera/{cam_id}/analytics/summary")
 async def get_camera_analytics_summary(cam_id: str):
-    """Return aggregated session statistics (time window)."""
-    state = _get_camera_state(cam_id)
-    if state["status"] != "ONLINE" or not state["analyser"]:
+    model = camera_registry.get(cam_id)
+    worker = camera_registry.get_worker(model.camera_id) if model else None
+    if not worker or not worker.analyser:
         raise HTTPException(status_code=400, detail="Camera is offline or analyser not ready.")
-    return state["analyser"].get_session_summary()
+    return worker.analyser.get_session_summary()
 
-
-# ── 13. /camera/{id}/analytics/history ──
 
 @app.get("/api/camera/{cam_id}/analytics/history")
 async def get_camera_analytics_history(cam_id: str, last_n: int = 60):
-    """Return historical metrics over a time window."""
-    state = _get_camera_state(cam_id)
-    if state["status"] != "ONLINE" or not state["analyser"]:
+    model = camera_registry.get(cam_id)
+    worker = camera_registry.get_worker(model.camera_id) if model else None
+    if not worker or not worker.analyser:
         raise HTTPException(status_code=400, detail="Camera is offline or analyser not ready.")
-    return state["analyser"].get_history(last_n=last_n, as_dicts=True)
+    return worker.analyser.get_history(last_n=last_n, as_dicts=True)
 
 
 # ── 12. /get-route-by-name ──
@@ -950,42 +1496,42 @@ async def get_route_by_name(req: NamedRouteRequest):
             detail="Route service is temporarily unavailable (loading graph). Please try again in a moment."
         )
 
-    # ── Inject live congestion from active cameras before routing ────────────
-    # Build a CongestionMap from all ONLINE cameras and merge them so the
-    # route planner's A* uses real observed congestion scores.
+    # ── Check active TFT congestion map in RoutePlanner ───────────────────────
+    # If RoutePlanner already has an active TFT forecast map, preserve it.
+    # Otherwise, fallback to checking frame metrics from ONLINE cameras.
     from route import CongestionMap as CMap
     try:
-        camera_maps = []
-        for cam in CAMERAS:
-            cid = cam["camera_id"]
-            cam_state = _get_camera_state(cid)
-            if cam_state["status"] == "ONLINE" and cam_state.get("metrics"):
-                score = cam_state["metrics"].get("congestion_score", 0.0)
-                if score > 0:
-                    cmap = CMap.from_frame_metrics(
-                        congestion_score=score,
-                        graph=app_state.route_planner._graph,
-                        camera_lat=cam["lat"],
-                        camera_lon=cam["lon"],
-                        radius_m=1000.0,
-                    )
-                    camera_maps.append(cmap)
+        current_cmap = getattr(app_state.route_planner, "_congestion_map", None)
+        if current_cmap is None or len(current_cmap) == 0:
+            camera_maps = []
+            for cam in CAMERAS:
+                cid = cam["camera_id"]
+                cam_state = _get_camera_state(cid)
+                if cam_state["status"] == "ONLINE" and cam_state.get("metrics"):
+                    score = cam_state["metrics"].get("congestion_score", 0.0)
+                    if score > 0:
+                        cmap = CMap.from_frame_metrics(
+                            congestion_score=score,
+                            graph=app_state.route_planner._graph,
+                            camera_lat=cam["lat"],
+                            camera_lon=cam["lon"],
+                            radius_m=30000.0,
+                        )
+                        camera_maps.append(cmap)
 
-        if camera_maps:
-            merged = CMap.merge(camera_maps)
-            app_state.route_planner.update_congestion(merged)
-        else:
-            # Also inject from the upload-video stream if active
-            if app_state.latest_metrics and app_state.latest_metrics.get("congestion_score", 0) > 0:
-                score = app_state.latest_metrics["congestion_score"]
-                # Use origin camera location as approximation
-                cmap = CMap(source="upload_stream", horizon="current")
-                # Apply to all graph nodes (global fallback when no camera coords)
-                for nid in list(app_state.route_planner._node_coords)[:500]:
-                    cmap.set(nid, score)
-                app_state.route_planner.update_congestion(cmap)
+            if camera_maps:
+                merged = CMap.merge(camera_maps)
+                app_state.route_planner.update_congestion(merged)
+            else:
+                # Also inject from upload-video stream if active
+                if app_state.latest_metrics and app_state.latest_metrics.get("congestion_score", 0) > 0:
+                    score = app_state.latest_metrics["congestion_score"]
+                    cmap = CMap(source="upload_stream", horizon="current")
+                    for nid in list(app_state.route_planner._node_coords)[:500]:
+                        cmap.set(nid, score / 100.0 if score > 1.0 else score)
+                    app_state.route_planner.update_congestion(cmap)
     except Exception as cmap_err:
-        print(f"[API] Congestion injection warning: {cmap_err} (routing will use distance-only)")
+        print(f"[API] Congestion injection note: {cmap_err} (routing will proceed)")
 
     comparison = app_state.route_planner.compare_routes(
         origin=origin,
@@ -1258,10 +1804,47 @@ async def calculate_diversion(req: DiversionRequest):
 @app.get("/api/alerts")
 async def get_alerts():
     """
-    Return active and historical traffic alerts.
+    Return active and historical traffic alerts based on real camera telemetry.
     """
+    from datetime import datetime, timezone
+    active_alerts = list(alert_audit_manager.get_active_alerts())
+    
+    # Check registered camera workers for dynamic threshold crossing
+    for cam in camera_registry.get_all():
+        w = camera_registry.get_worker(cam.camera_id)
+        if w and w.latest_telemetry:
+            tel = w.latest_telemetry
+            c_score = tel.get("congestion_score", 0.0)
+            spd = tel.get("average_speed_kmh", 0.0) or 0.0
+            v_cnt = tel.get("vehicle_count", 0)
+            
+            if c_score >= 0.80:
+                active_alerts.insert(0, {
+                    "alert_id": f"ALT-CRIT-{cam.camera_id}",
+                    "camera_id": cam.camera_id,
+                    "location": f"{cam.road} — {cam.location}",
+                    "severity": "CRITICAL",
+                    "level": "CRITICAL",
+                    "reason": f"Critical congestion detected ({c_score*100:.0f}% occupancy, {v_cnt} vehicles, {spd:.1f} km/h)",
+                    "action": "Activate alternate corridor diversion immediately.",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "status": "ACTIVE"
+                })
+            elif c_score >= 0.50:
+                active_alerts.append({
+                    "alert_id": f"ALT-MOD-{cam.camera_id}",
+                    "camera_id": cam.camera_id,
+                    "location": f"{cam.road} — {cam.location}",
+                    "severity": "WARNING",
+                    "level": "MODERATE",
+                    "reason": f"Moderate congestion building up ({v_cnt} vehicles, {spd:.1f} km/h)",
+                    "action": "Monitor corridor flow and prepare signal timing adjustment.",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "status": "ACTIVE"
+                })
+
     return {
-        "alerts": alert_audit_manager.get_active_alerts()
+        "alerts": active_alerts
     }
 
 
@@ -1315,6 +1898,38 @@ async def query_rag_knowledge(q: str, congestion_score: float = 0.5):
 
 if __name__ == "__main__":
     import uvicorn
-    # Allow running directly via `python backend/main.py`
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    import sys
+    import socket
+
+    port = int(os.getenv("PORT", "8000"))
+    host = os.getenv("HOST", "0.0.0.0")
+
+    # Check for CLI argument overrides
+    for arg in sys.argv[1:]:
+        if arg.startswith("--port="):
+            port = int(arg.split("=")[1])
+        elif arg.startswith("--host="):
+            host = arg.split("=")[1]
+
+    # Test socket availability
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.bind((host, port))
+        sock.close()
+    except OSError as e:
+        print(f"[System] Warning: Cannot bind directly to {host}:{port} ({e}).")
+        # Try localhost if 0.0.0.0 had permission restrictions
+        if host == "0.0.0.0":
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.bind(("127.0.0.1", port))
+                sock.close()
+                host = "127.0.0.1"
+                print(f"[System] Falling back to host: {host}")
+            except Exception:
+                pass
+
+    print(f"[System] Starting TrafficControl Backend Server on http://{host}:{port}")
+    uvicorn.run("main:app", host=host, port=port, log_level="info", reload=False)
 

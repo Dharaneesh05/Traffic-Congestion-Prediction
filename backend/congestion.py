@@ -333,13 +333,13 @@ class DataPreprocessor:
         for minute_key in sorted(buckets.keys()):
             frames = buckets[minute_key]
 
-            # Collect values
-            counts   = [f["vehicle_count"]     for f in frames]
-            densities= [f["vehicle_density"]    for f in frames]
-            speeds   = [f["average_speed_kmh"]  for f in frames if f["average_speed_kmh"] > 0]
-            flows    = [f["traffic_flow_vpm"]   for f in frames]
-            occs     = [f["road_occupancy"]     for f in frames]
-            scores   = [f["congestion_score"]   for f in frames]
+            # Collect values safely
+            counts   = [f.get("vehicle_count", f.get("total_count", f.get("total", 0))) for f in frames]
+            densities= [f.get("vehicle_density", f.get("road_occupancy", 0.0)) for f in frames]
+            speeds   = [f.get("average_speed_kmh", f.get("average_speed", 0.0)) for f in frames if f.get("average_speed_kmh", f.get("average_speed", 0.0)) > 0]
+            flows    = [f.get("traffic_flow_vpm", 0.0) for f in frames]
+            occs     = [f.get("road_occupancy", 0.0) for f in frames]
+            scores   = [f.get("congestion_score", 0.0) for f in frames]
 
             # Use the last frame's wall_time_s as the minute representative
             ref_time_s = frames[-1].get("wall_time_s", minute_key * 60.0)
@@ -347,12 +347,12 @@ class DataPreprocessor:
             minute_records.append({
                 "minute_key":        minute_key,
                 "wall_time_s":       ref_time_s,
-                "vehicle_count":     float(sum(counts) / len(counts)),
-                "vehicle_density":   float(sum(densities) / len(densities)),
+                "vehicle_count":     float(sum(counts) / len(counts)) if counts else 0.0,
+                "vehicle_density":   float(sum(densities) / len(densities)) if densities else 0.0,
                 "average_speed_kmh": float(sum(speeds) / len(speeds)) if speeds else 0.0,
-                "traffic_flow_vpm":  float(max(flows)),
-                "road_occupancy":    float(sum(occs) / len(occs)),
-                "congestion_score":  float(max(scores)),
+                "traffic_flow_vpm":  float(max(flows)) if flows else 0.0,
+                "road_occupancy":    float(sum(occs) / len(occs)) if occs else 0.0,
+                "congestion_score":  float(max(scores)) if scores else 0.0,
             })
 
         # Forward-fill then backward-fill any missing minutes
@@ -730,13 +730,7 @@ def _build_tft_model(config: TFTConfig) -> Any:
     def vsn(inputs_tensor, n_vars: int, name_prefix: str):
         # inputs_tensor shape: (batch, time, n_vars)
         # Split along feature axis → list of (batch, time, 1)
-        split_inputs = [
-            layers.Lambda(
-                lambda t, i=i: t[:, :, i:i+1],
-                name=f"{name_prefix}_split_{i}"
-            )(inputs_tensor)
-            for i in range(n_vars)
-        ]
+        split_inputs = tf.split(inputs_tensor, num_or_size_splits=n_vars, axis=-1)
 
         # Process each variable through its own GRN
         var_processed = [
@@ -744,30 +738,21 @@ def _build_tft_model(config: TFTConfig) -> Any:
             for i, inp in enumerate(split_inputs)
         ]
 
-        # Stack → (batch, time, n_vars, units)
-        var_stack = layers.Lambda(
-            lambda lst: tf.stack(lst, axis=2),
-            name=f"{name_prefix}_stack"
-        )(var_processed)
+        # Stack → (batch, time, n_vars, units) via Concatenate + Reshape
+        # Concatenate along last axis: (batch, time, n_vars * units)
+        var_concat = layers.Concatenate(axis=-1, name=f"{name_prefix}_concat")(var_processed)
+        var_stack = layers.Reshape((-1, n_vars, units), name=f"{name_prefix}_stack")(var_concat)
 
         # Selection weights via GRN on flat concatenation of raw inputs
-        flat_concat = layers.Lambda(
-            lambda t: tf.reshape(t, [tf.shape(t)[0], tf.shape(t)[1], n_vars]),
-            name=f"{name_prefix}_flatten"
-        )(inputs_tensor)
+        flat_concat = layers.Reshape((-1, n_vars), name=f"{name_prefix}_flatten")(inputs_tensor)
         weight_logits = grn(flat_concat, name_prefix=f"{name_prefix}_weight_grn")
         weight_logits = layers.Dense(n_vars, name=f"{name_prefix}_weight_proj")(weight_logits)
         weights = layers.Softmax(axis=-1, name=f"{name_prefix}_softmax")(weight_logits)
 
         # Weighted sum: (batch, time, n_vars, units) × (batch, time, n_vars, 1)
-        weights_exp = layers.Lambda(
-            lambda w: tf.expand_dims(w, -1),
-            name=f"{name_prefix}_weights_exp"
-        )(weights)
-        combined = layers.Lambda(
-            lambda args: tf.reduce_sum(args[0] * args[1], axis=2),
-            name=f"{name_prefix}_combined"
-        )([var_stack, weights_exp])
+        weights_exp = layers.Reshape((-1, n_vars, 1), name=f"{name_prefix}_weights_exp")(weights)
+        weighted_vars = layers.Multiply(name=f"{name_prefix}_weighted_mult")([var_stack, weights_exp])
+        combined = tf.reduce_sum(weighted_vars, axis=2)
 
         return combined, weights   # (batch, time, units), (batch, time, n_vars)
 
@@ -776,9 +761,8 @@ def _build_tft_model(config: TFTConfig) -> Any:
     dec_input = layers.Input(shape=(hor, n_time), name="decoder_input")
 
     # ── Encoder path ──────────────────────────────────────────────────────────
-    # Project each encoder feature from 1 → units dimension before VSN
-    enc_projected = layers.Dense(units, name="enc_projection")(enc_input)
-    enc_selected, enc_weights = vsn(enc_projected, n_enc, name_prefix="enc_vsn")
+    # Feed raw encoder input (batch, time, n_enc) into VSN
+    enc_selected, enc_weights = vsn(enc_input, n_enc, name_prefix="enc_vsn")
     enc_selected = layers.Dropout(d_rate, name="enc_drop")(enc_selected)
 
     # LSTM Encoder: processes lookback_min steps, passes state to decoder
@@ -792,9 +776,8 @@ def _build_tft_model(config: TFTConfig) -> Any:
     enc_out = grn(enc_out, name_prefix="enc_grn_post")
 
     # ── Decoder path ──────────────────────────────────────────────────────────
-    # Project each time feature from 1 → units
-    dec_projected = layers.Dense(units, name="dec_projection")(dec_input)
-    dec_selected, dec_weights = vsn(dec_projected, n_time, name_prefix="dec_vsn")
+    # Feed raw decoder input (batch, time, n_time) into VSN
+    dec_selected, dec_weights = vsn(dec_input, n_time, name_prefix="dec_vsn")
     dec_selected = layers.Dropout(d_rate, name="dec_drop")(dec_selected)
 
     # LSTM Decoder: initialised with encoder's final state (seq2seq handoff)
@@ -914,6 +897,10 @@ class CongestionPredictor:
         self._is_trained: bool = False
         self._build_time_s: float = 0.0
         self._train_time_s: float = 0.0
+
+    @property
+    def is_trained(self) -> bool:
+        return self._is_trained
 
     # ── Build ─────────────────────────────────────────────────────────────────
 
@@ -1154,7 +1141,28 @@ class CongestionPredictor:
             When the model is NOT trained (e.g. first launch), this returns a
             rule-based heuristic forecast so the API never returns an error.
         """
+        if not recent_history:
+            return self._heuristic_forecast(recent_history)
+
+        # 1. Log live telemetry received
+        latest = recent_history[-1]
+        v_count = latest.get("vehicle_count", latest.get("total_count", latest.get("total", 0)))
+        v_density = latest.get("vehicle_density", latest.get("road_occupancy", 0.0))
+        v_speed = latest.get("average_speed_kmh", latest.get("average_speed", 0.0))
+        v_flow = latest.get("traffic_flow_vpm", 0.0)
+        v_occ = latest.get("road_occupancy", 0.0)
+        v_score = latest.get("congestion_score", 0.0)
+
+        print("[Predictor] Live telemetry received:")
+        print(f"  vehicle_count={v_count}")
+        print(f"  vehicle_density={v_density:.4f}" if isinstance(v_density, float) else f"  vehicle_density={v_density}")
+        print(f"  average_speed_kmh={v_speed:.2f}" if isinstance(v_speed, float) else f"  average_speed_kmh={v_speed}")
+        print(f"  traffic_flow_vpm={v_flow:.2f}" if isinstance(v_flow, float) else f"  traffic_flow_vpm={v_flow}")
+        print(f"  road_occupancy={v_occ:.4f}" if isinstance(v_occ, float) else f"  road_occupancy={v_occ}")
+        print(f"  congestion_score={v_score:.4f}" if isinstance(v_score, float) else f"  congestion_score={v_score}")
+
         if self._model is None or not self._is_trained:
+            print("[Predictor] Insufficient live telemetry — heuristic fallback active.")
             return self._heuristic_forecast(recent_history)
 
         try:
@@ -1165,16 +1173,14 @@ class CongestionPredictor:
             lb  = self.config.lookback_min
             hor = HORIZON_MAX
 
-            if len(records) < lb + hor:
-                # Not enough history yet — use heuristic
+            if len(records) < lb:
+                print("[Predictor] Insufficient live telemetry — heuristic fallback active.")
                 return self._heuristic_forecast(recent_history)
 
+            print("[Predictor] Using trained TFT model for live forecast.")
+
             # Build a single sequence from the tail of the records
-            # We need the last `lb` records for the encoder and next `hor`
-            # time features for the decoder.
-            # For live prediction, we synthesise future time features from
-            # the last known timestamp + minute offsets.
-            enc_records = records[-(lb + hor) : -hor] if hor < len(records) else records[:lb]
+            enc_records = records[-lb:]
             last_time_s = records[-1]["wall_time_s"]
 
             # Build future time feature records
@@ -1200,10 +1206,14 @@ class CongestionPredictor:
             # Raw model output: (1, HORIZON_MAX, n_q)
             raw = self.predict(X, D)[0]   # (HORIZON_MAX, n_q)
 
-            return self._format_forecast(raw)
+            forecast = self._format_forecast(raw)
+            forecast["telemetry_status"] = "trained_tft"
+            forecast["minute_records"] = len(records)
+            return forecast
 
         except Exception as exc:
             print(f"[Predictor] predict_live error: {exc} — using heuristic")
+            print("[Predictor] Insufficient live telemetry — heuristic fallback active.")
             return self._heuristic_forecast(recent_history)
 
     def _format_forecast(self, raw: np.ndarray) -> dict:
@@ -1243,7 +1253,7 @@ class CongestionPredictor:
 
     def _heuristic_forecast(self, recent_history: List[dict]) -> dict:
         """
-        Rule-based fallback forecast when the TFT model is not yet trained.
+        Rule-based fallback forecast when the TFT model is not yet trained or telemetry is insufficient.
 
         Uses the mean of the last 5 congestion scores and adds uncertainty.
         This ensures the FastAPI endpoint always returns a valid response.
@@ -1256,7 +1266,7 @@ class CongestionPredictor:
         """
         recent_scores = [
             d.get("congestion_score", 0.3)
-            for d in recent_history[-300:]   # last 10s at 30fps
+            for d in (recent_history[-300:] if recent_history else [])
         ]
         base = float(np.mean(recent_scores)) if recent_scores else 0.3
 
@@ -1277,10 +1287,12 @@ class CongestionPredictor:
             }
 
         result["model_info"] = {
-            "is_trained":   False,
+            "is_trained":   self._is_trained,
             "lookback_min": self.config.lookback_min,
-            "note":         "Heuristic forecast — TFT not yet trained",
+            "quantiles":    QUANTILES,
+            "note":         "Heuristic fallback active — insufficient live telemetry history" if self._is_trained else "Heuristic forecast — TFT not yet trained",
         }
+        result["telemetry_status"] = "heuristic_fallback"
         return result
 
     # ── Save / Load ───────────────────────────────────────────────────────────
@@ -1355,13 +1367,29 @@ class CongestionPredictor:
             raise ImportError("[Predictor] TensorFlow required for loading.")
 
         path = Path(path)
-        model_path  = path.with_suffix(".keras")
-        scaler_path = path.with_suffix(".scaler.json")
+        candidates = [
+            path,
+            Path("backend/models/tft"),
+            Path("models/tft"),
+            Path(__file__).parent / "models" / "tft",
+            Path(__file__).parent.parent / "backend" / "models" / "tft",
+        ]
 
-        if not model_path.exists():
-            raise FileNotFoundError(f"[Predictor] Model file not found: {model_path}")
-        if not scaler_path.exists():
-            raise FileNotFoundError(f"[Predictor] Scaler file not found: {scaler_path}")
+        model_path = None
+        scaler_path = None
+        for cand in candidates:
+            mp = cand.with_suffix(".keras")
+            sp = cand.with_suffix(".scaler.json")
+            if mp.exists() and sp.exists():
+                model_path = mp
+                scaler_path = sp
+                break
+
+        if model_path is None or scaler_path is None:
+            raise FileNotFoundError(
+                f"[Predictor] Model or scaler file not found for path: {path} "
+                f"(Checked: {[str(c) for c in candidates]})"
+            )
 
         # Load scaler to reconstruct config
         with open(scaler_path) as fh:
@@ -1372,10 +1400,11 @@ class CongestionPredictor:
         # Reconstruct predictor
         predictor = cls(config)
 
-        # Load model with custom loss
+        # Load model with custom loss and safe_mode=False for Lambda layers
         predictor._model = tf.keras.models.load_model(
             str(model_path),
             custom_objects={"quantile_loss": _quantile_loss(QUANTILES)},
+            safe_mode=False,
         )
         predictor.preprocessor.set_scaler_state(scaler_state)
         predictor._is_trained = True

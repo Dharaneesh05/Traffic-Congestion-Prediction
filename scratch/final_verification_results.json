@@ -1,0 +1,114 @@
+[
+  {
+    "test": "Test 1: Health Check",
+    "endpoint": "GET /api/health",
+    "expected": "HTTP 200, detector=true, tracker=true, route_engine=true",
+    "actual": "HTTP 200, {\"status\": \"ok\", \"detector\": true, \"tracker\": true, \"route_engine\": true, \"database\": true, \"redis\": false}",
+    "status": "PASS",
+    "evidence": "Status code: 200, response: {'status': 'ok', 'detector': True, 'tracker': True, 'route_engine': True, 'database': True, 'redis': False}"
+  },
+  {
+    "test": "Test 2: OSM Routing Status",
+    "endpoint": "GET /api/routing-status",
+    "expected": "is_loaded=true, source=osm_pbf, node_count ~3M, edge_count ~5.8M, fast_snap=true",
+    "actual": "is_loaded=True, source=osm_pbf, nodes=3,065,575, edges=5,870,381, fast_snap=True",
+    "status": "PASS",
+    "evidence": "{\"status\": \"ready\", \"error\": null, \"is_loaded\": true, \"load_error\": null, \"node_count\": 3065575, \"edge_count\": 5870381, \"congestion_map_size\": 0, \"congestion_source\": \"manual\", \"osm_pbf_path\": \"D:\\\\Dharaneesh\\\\Project\\\\Smart Traffic Congestion System\\\\Phase I\\\\Traffic-Congestion-Prediction\\\\datasets\\\\osm\\\\southern-zone-latest.osm.pbf\", \"graph_cache_path\": \"D:\\\\Dharaneesh\\\\Project\\\\Smart Traffic Congestion System\\\\Phase I\\\\Traffic-Congestion-Prediction\\\\datasets\\\\osm\\\\southern_zone_graph.pkl.gz\", \"network_type\": \"driving\", \"congestion_penalty\": 10.0, \"max_congestion_score\": 0.95, \"forecast_horizon\": \"5min\", \"fast_snap\": true, \"graph_source\": \"osm_pbf\"}"
+  },
+  {
+    "test": "Test 3: Location Registry",
+    "endpoint": "GET /api/locations",
+    "expected": "HTTP 200, all registered named Tamil Nadu locations returned",
+    "actual": "HTTP 200, 28 locations returned",
+    "status": "PASS",
+    "evidence": "Locations count: 28, samples: ['Salem Bus Stand', 'Erode Bus Stand', 'Namakkal Bus Stand', 'Karur Bus Stand']"
+  },
+  {
+    "test": "Test 4: Basic Real OSM Routing (Salem -> Erode)",
+    "endpoint": "POST /api/get-route-by-name",
+    "expected": "found=true, distance ~60-70km, realistic travel time, >500 waypoints, >500 nodes",
+    "actual": "found=True, dist=63.32km, time=54.6min, waypoints=1324, search_ms=1042.7ms",
+    "status": "PASS",
+    "evidence": "First 2 waypoints: [[11.664477, 78.146044], [11.664704, 78.145893]], Last 2: [[11.340967, 77.717131], [11.340991, 77.717187]]"
+  },
+  {
+    "test": "Test 5: Second OSM Route (Karur -> Namakkal, Duplicate-Coords)",
+    "endpoint": "POST /api/get-route-by-name",
+    "expected": "found=true, non-null distance, waypoints returned without duplicate-coord failure",
+    "actual": "found=True, dist=34.34km, time=38.2min, waypoints=434, search_ms=315.7ms",
+    "status": "PASS",
+    "evidence": "Start coords: {'node_id': 11792224929, 'lat': 10.9601331, 'lon': 78.0759385}, End coords: {'node_id': 9594311380, 'lat': 11.2185019, 'lon': 78.1671681}"
+  },
+  {
+    "test": "Test 6: Longer Route (Salem -> Coimbatore)",
+    "endpoint": "POST /api/get-route-by-name",
+    "expected": "found=true, valid long-distance OSM route (~150-170km), >1500 waypoints",
+    "actual": "found=True, dist=160.17km, time=140.6min, waypoints=2928, search_ms=7078.4ms",
+    "status": "PASS",
+    "evidence": "Distance: 160.17km, Time: 140.6min, Nodes: 2928"
+  },
+  {
+    "test": "Test 7: Invalid Coordinates Handling",
+    "endpoint": "POST /api/get-route",
+    "expected": "Server does not crash, returns graceful response / error without traceback",
+    "actual": "HTTP 200, safe response returned",
+    "status": "PASS",
+    "evidence": "Response: {'distance': {'found': True, 'message': 'Route found.', 'strategy': 'distance', 'origin': {'node_id': 6102548036, 'lat': 10.5925297, 'lon': 75.9997139}, 'destination': {'node_id': 6102548036, 'lat': 10.5925297, 'lon': 75.9997139}, 'metrics': {'total_distance_m': 0.0, 'total_time_min': 0.0, 'avg_congestion': 0.0, 'num_waypoints': 1, 'search_time_ms': 1.31}, 'waypoints': [[10.59253, 75.999714]], 'node_path': [6102548036], 'edge_congestion': []}, 'congestion': {'found': True, 'message': 'Route found.', 'strategy': 'congestion', 'origin': {'node_id': 6102548036, 'lat': 10.5925297, 'lon': 75.9997139}, 'destination': {'node_id': 6102548036, 'lat': 10.5925297, 'lon': 75.9997139}, 'metrics': {'total_distance_m': 0.0, 'total_time_min': 0.0, 'avg_congestion': 0.0, 'num_waypoints': 1, 'search_time_ms': 1.02}, 'waypoints': [[10.59253, 75.999714]], 'node_path': [6102548036], 'edge_congestion': []}, 'forecast': {'found': True, 'message': 'Route found.', 'strategy': 'forecast', 'origin': {'node_id': 6102548036, 'lat': 10.5925297, 'lon': 75.9997139}, 'destination': {'node_id': 6102548036, 'lat': 10.5925297, 'lon': 75.9997139}, 'metrics': {'total_distance_m': 0.0, 'total_time_min': 0.0, 'avg_congestion': 0.0, 'num_waypoints': 1, 'search_time_ms': 0.98}, 'waypoints': [[10.59253, 75.999714]], 'node_path': [6102548036], 'edge_congestion': []}, 'recommendation': 'distance', 'savings': {'extra_distance_m': 0.0, 'time_saved_min': 0.0}}"
+  },
+  {
+    "test": "Test 8: Start CCTV & Telemetry Generation",
+    "endpoint": "POST /api/cameras/CCTV-SKG-01/start + GET .../telemetry",
+    "expected": "camera status online, all 6 telemetry features generated",
+    "actual": "status=online, all 6 fields present=True",
+    "status": "PASS",
+    "evidence": "{\"frame_index\": 3, \"timestamp_ms\": 163984.94, \"wall_time_s\": 1788625727.9977, \"vehicle_count\": 10, \"vehicle_density\": 2.0, \"average_speed_kmh\": 19.26, \"traffic_flow_vpm\": 1.0, \"road_occupancy\": 0.1403, \"congestion_score\": 0.3652, \"congestion_level\": \"LIGHT\", \"movement_direction\": \"Southbound\", \"class_counts\": {\"car\": 9, \"truck\": 1, \"bus\": 0, \"motorcycle\": 0}, \"speed_by_class\": {\"car\": 19.26}, \"camera_id\": \"CCTV-SKG-01\"}"
+  },
+  {
+    "test": "Test 9: TFT Live Forecasting",
+    "endpoint": "GET /api/cameras/CCTV-SKG-01/forecast",
+    "expected": "mode=trained_tft (or fallback if history building), q10/q50/q90 for 5/10/15/30min, values [0,1]",
+    "actual": "mode=trained_tft, 4 horizons present=True, values in [0,1]=True",
+    "status": "PASS",
+    "evidence": "{\"5min\": {\"q10\": 0.3682, \"q50\": 0.4554, \"q90\": 0.4919, \"level_q50\": \"MODERATE\", \"level_q90\": \"MODERATE\", \"uncertain\": false}, \"10min\": {\"q10\": 0.4254, \"q50\": 0.491, \"q90\": 0.5371, \"level_q50\": \"MODERATE\", \"level_q90\": \"MODERATE\", \"uncertain\": false}, \"15min\": {\"q10\": 0.4024, \"q50\": 0.4838, \"q90\": 0.5328, \"level_q50\": \"MODERATE\", \"level_q90\": \"MODERATE\", \"uncertain\": false}, \"30min\": {\"q10\": 0.4531, \"q50\": 0.5036, \"q90\": 0.5485, \"level_q50\": \"MODERATE\", \"level_q90\": \"MODERATE\", \"uncertain\": false}, \"model_info\": {\"is_trained\": true, \"lookback_min\": 60, \"quantiles\": [0.1, 0.5, 0.9]}, \"telemetry_status\": \"trained_tft\", \"minute_records\": 61}"
+  },
+  {
+    "test": "Test 10: TFT -> OSM Congestion Injection",
+    "endpoint": "GET /api/routing-status",
+    "expected": "Routing status active, congestion map verified on real OSM graph",
+    "actual": "congestion_map_size=9714, source=TFT-5min, total_nodes=3,065,575",
+    "status": "PASS",
+    "evidence": "{\"status\": \"ready\", \"error\": null, \"is_loaded\": true, \"load_error\": null, \"node_count\": 3065575, \"edge_count\": 5870381, \"congestion_map_size\": 9714, \"congestion_source\": \"TFT-5min\", \"osm_pbf_path\": \"D:\\\\Dharaneesh\\\\Project\\\\Smart Traffic Congestion System\\\\Phase I\\\\Traffic-Congestion-Prediction\\\\datasets\\\\osm\\\\southern-zone-latest.osm.pbf\", \"graph_cache_path\": \"D:\\\\Dharaneesh\\\\Project\\\\Smart Traffic Congestion System\\\\Phase I\\\\Traffic-Congestion-Prediction\\\\datasets\\\\osm\\\\southern_zone_graph.pkl.gz\", \"network_type\": \"driving\", \"congestion_penalty\": 10.0, \"max_congestion_score\": 0.95, \"forecast_horizon\": \"5min\", \"fast_snap\": true, \"graph_source\": \"osm_pbf\"}"
+  },
+  {
+    "test": "Test 11: Congestion-Aware Route Comparison (Salem -> Erode)",
+    "endpoint": "POST /api/get-route-by-name",
+    "expected": "Distance, congestion, and forecast strategies evaluated; metrics and savings returned",
+    "actual": "All 3 strategies found: dist=63.32km (54.6min), fore=67.43km (75.9min), rec=distance",
+    "status": "PASS",
+    "evidence": "Savings: {'extra_distance_m': 0.0, 'time_saved_min': 0.0}, Search Time: 1432.9ms"
+  },
+  {
+    "test": "Test 12: Repeated Live Pipeline Stability",
+    "endpoint": "Telemetry + Forecast + Routing Loops",
+    "expected": "Telemetry, TFT, and routing continue updating seamlessly without race conditions or errors",
+    "actual": "3/3 consecutive polling cycles succeeded cleanly",
+    "status": "PASS",
+    "evidence": "Successful iterations: 3/3"
+  },
+  {
+    "test": "Test 13: Stop CCTV Camera Cleanly",
+    "endpoint": "POST /api/cameras/CCTV-SKG-01/stop",
+    "expected": "Camera status becomes stopped, worker thread joins, backend remains healthy",
+    "actual": "Stop HTTP 200, camera status=offline",
+    "status": "PASS",
+    "evidence": "Response: {'message': \"Camera 'CCTV-SKG-01' stopped.\", 'camera': {'camera_id': 'CCTV-SKG-01', 'name': 'North Approach', 'location': 'Sankagiri', 'road': 'NH544 Salem Inflow', 'source_type': 'video', 'source': 'D:\\\\Dharaneesh\\\\Project\\\\Smart Traffic Congestion System\\\\Phase I\\\\Traffic-Congestion-Prediction\\\\datasets\\\\videos\\\\Traffic.mp4', 'junction_id': 'JUNC_SANKAGIRI_01', 'approach': 'North Approach', 'status': 'stopped', 'created_at': '2026-09-05T16:23:42.797326+00:00', 'last_frame_at': '2026-09-05T16:43:25.821086+00:00', 'error_message': None}}"
+  },
+  {
+    "test": "Test 14: Final Backend Post-Stop Health Check",
+    "endpoint": "All Core GET & POST APIs",
+    "expected": "All endpoints return HTTP 200, routing continues functioning after camera stops",
+    "actual": "Health=200, RoutingStatus=200, Locations=200, RouteSearch=200",
+    "status": "PASS",
+    "evidence": "Final Route Distance: 63.32 km"
+  }
+]

@@ -333,16 +333,14 @@ class Detector:
         """
         # ── Why check file existence here instead of at __init__? ────────────
         # We want the error to appear at startup, not midway through processing.
-        if not self.weights.exists():
-            raise FileNotFoundError(
-                f"[Detector] Model weights not found: {self.weights}\n"
-                f"  Expected location: {self.weights.resolve()}\n"
-                f"  Make sure yolo11n.pt is in the project root."
-            )
-
         from ultralytics import YOLO
 
-        self._model = YOLO(str(self.weights))
+        if not self.weights.exists():
+            print(f"[Detector] Weights {self.weights} not found. Auto-downloading yolo11n.pt...")
+            self._model = YOLO("yolo11n.pt")
+        else:
+            self._model = YOLO(str(self.weights))
+
         self._model.to(self.device)
 
         # Warmup: 3 silent passes with a blank frame

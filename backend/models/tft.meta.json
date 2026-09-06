@@ -1,0 +1,62 @@
+{
+  "trained_at": "2026-09-05T05:53:25.484208+00:00",
+  "model_architecture": "Temporal Fusion Transformer (TFT)",
+  "parameters": 296981,
+  "training_duration_s": 106.84,
+  "epochs_trained": 45,
+  "final_train_loss": 0.005196529906243086,
+  "final_val_loss": 0.011047511361539364,
+  "test_pinball_loss": 0.09182264655828476,
+  "overall_tft_mae": 0.2124,
+  "overall_tft_rmse": 0.2285,
+  "overall_baseline_mae": 0.533,
+  "overall_baseline_rmse": 0.5416,
+  "horizons_evaluation": {
+    "5min": {
+      "horizon_step": 5,
+      "tft_mae": 0.0264,
+      "tft_rmse": 0.0302,
+      "baseline_mae": 0.381,
+      "baseline_rmse": 0.3812,
+      "mae_improvement_pct": 93.07
+    },
+    "10min": {
+      "horizon_step": 10,
+      "tft_mae": 0.2038,
+      "tft_rmse": 0.2061,
+      "baseline_mae": 0.5546,
+      "baseline_rmse": 0.5547,
+      "mae_improvement_pct": 63.25
+    },
+    "15min": {
+      "horizon_step": 15,
+      "tft_mae": 0.2686,
+      "tft_rmse": 0.2686,
+      "baseline_mae": 0.5933,
+      "baseline_rmse": 0.5942,
+      "mae_improvement_pct": 54.73
+    },
+    "30min": {
+      "horizon_step": 30,
+      "tft_mae": 0.2555,
+      "tft_rmse": 0.2555,
+      "baseline_mae": 0.5881,
+      "baseline_rmse": 0.5889,
+      "mae_improvement_pct": 56.56
+    }
+  },
+  "config": {
+    "lookback_min": 60,
+    "hidden_units": 64,
+    "num_heads": 4,
+    "lstm_units": 64,
+    "dropout_rate": 0.1,
+    "batch_size": 16,
+    "learning_rate": 0.001,
+    "quantiles": [
+      0.1,
+      0.5,
+      0.9
+    ]
+  }
+}
