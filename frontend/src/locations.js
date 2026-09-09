@@ -37,9 +37,12 @@ export const TAMIL_NADU_LOCATIONS = [
   { name: "Puducherry", lat: 11.9416, lon: 79.8083, district: "Puducherry", type: "East Coast Arterial" },
   { name: "Ooty", lat: 11.4102, lon: 76.6950, district: "Nilgiris", type: "Hill Corridor Link" },
   { name: "Mettur", lat: 11.7872, lon: 77.8010, district: "Salem", type: "Cauvery Link" },
-  { name: "Gobichettipalayam", lat: 11.4537, lon: 77.4357, district: "Erode", type: "State Highway SH15" },
   { name: "Sankagiri", lat: 11.4800, lon: 77.8700, district: "Salem", type: "NH544 Primary Inflow Hub" },
-
+  { name: "Vedaranyam", lat: 10.3756, lon: 79.8512, district: "Nagapattinam", type: "Coastal Town & Highway Node" },
+  { name: "Gandhipuram", lat: 11.0168, lon: 76.9674, district: "Coimbatore", type: "Central Commercial & Bus Hub" },
+  { name: "Koyambedu", lat: 13.0694, lon: 80.2057, district: "Chennai", type: "Metropolitan Transit Hub" },
+  { name: "Goripalayam", lat: 9.9320, lon: 78.1300, district: "Madurai", type: "North Vaigai River Arterial Hub" },
+  { name: "Velankanni", lat: 10.6800, lon: 79.8400, district: "Nagapattinam", type: "Pilgrim & Coastal Corridor" },
   // Key Bus Stands & Terminals
   { name: "Salem Bus Stand", lat: 11.6643, lon: 78.1460, district: "Salem", type: "Central Bus Terminal" },
   { name: "Erode Bus Stand", lat: 11.3410, lon: 77.7172, district: "Erode", type: "Central Bus Terminal" },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Navigation2, ArrowRightLeft, Loader2 } from "lucide-react";
+import { Navigation2, ArrowRightLeft, Loader2, AlertTriangle, ShieldCheck, CornerDownRight } from "lucide-react";
 import { TAMIL_NADU_LOCATIONS } from "../locations";
 
 const STANDARD_CORRIDORS = [
@@ -16,6 +16,10 @@ export default function RoutePlanner({
   isLoading = false,
   selectedFrom = "Salem Bus Stand",
   selectedTo = "Erode Bus Stand",
+  selectedJunction = null,
+  onEvaluateDiversion,
+  diversionData = null,
+  onClearDiversion,
 }) {
   const [fromName, setFromName] = useState(selectedFrom);
   const [toName, setToName] = useState(selectedTo);
@@ -54,6 +58,9 @@ export default function RoutePlanner({
     }
   };
 
+  const hasDiversion = selectedJunction?.diversion != null;
+  const divInfo = selectedJunction?.diversion;
+
   return (
     <div
       style={{
@@ -64,16 +71,90 @@ export default function RoutePlanner({
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
+        gap: "0.625rem",
       }}
     >
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
           <h2 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-primary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            ROUTE PLANNER
+            ROUTE PLANNER & DIVERSION
           </h2>
-          <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>A* Heuristic Engine</span>
         </div>
 
+        {/* Junction Diversion Advisory Box if selected junction has active congestion */}
+        {hasDiversion && (
+          <div
+            style={{
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              borderRadius: "2px",
+              padding: "0.5rem 0.625rem",
+              marginBottom: "0.625rem",
+              fontSize: "0.6875rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+              <strong style={{ color: "#1e40af" }}>{selectedJunction.name} Diversion</strong>
+              <span style={{ color: "#16a34a", fontWeight: 700 }}>
+                Est. Save: {divInfo.timeSavedMin || 14} min
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px", color: "#334155" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#dc2626" }} />
+                <span>Congested: <strong>{divInfo.congestedSegmentName}</strong></span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#2563eb" }} />
+                <span>Recommended: <strong>{divInfo.recommendedName}</strong></span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a" }} />
+                <span>Alternative: <strong>{divInfo.alternativeName}</strong></span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "4px", marginTop: "6px" }}>
+              <button
+                onClick={() => onEvaluateDiversion && onEvaluateDiversion(selectedJunction)}
+                style={{
+                  flex: 1,
+                  padding: "3px 6px",
+                  fontSize: "0.625rem",
+                  fontWeight: 700,
+                  background: "#2563eb",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "2px",
+                  cursor: "pointer",
+                }}
+              >
+                Render Diversion on Map
+              </button>
+
+              {diversionData && onClearDiversion && (
+                <button
+                  onClick={onClearDiversion}
+                  style={{
+                    padding: "3px 6px",
+                    fontSize: "0.625rem",
+                    fontWeight: 600,
+                    background: "#f1f5f9",
+                    color: "#64748b",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "2px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Standard Corridor Route Form */}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
           {/* Origin */}
           <div>
@@ -101,26 +182,26 @@ export default function RoutePlanner({
             </select>
           </div>
 
-          {/* Swap */}
+          {/* Swap Button */}
           <div style={{ display: "flex", justifyContent: "center", margin: "-2px 0" }}>
             <button
               type="button"
               onClick={handleSwap}
               style={{
-                background: "var(--bg-card-subtle)",
                 border: "1px solid var(--border-default)",
+                background: "#ffffff",
                 borderRadius: "2px",
-                width: "22px",
-                height: "22px",
+                padding: "2px 6px",
+                cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                color: "var(--text-secondary)",
+                gap: "2px",
+                fontSize: "0.625rem",
+                color: "var(--text-muted)",
               }}
-              title="Swap"
             >
               <ArrowRightLeft size={10} />
+              <span>Swap</span>
             </button>
           </div>
 
@@ -150,61 +231,63 @@ export default function RoutePlanner({
             </select>
           </div>
 
-          {/* Calculate Button */}
+          {/* Calculate Route Button */}
           <button
             type="submit"
-            disabled={isLoading || !fromName || !toName}
+            disabled={isLoading}
             style={{
-              background: "#2563eb",
+              marginTop: "0.3rem",
+              background: "#0f172a",
               color: "#ffffff",
               border: "none",
               borderRadius: "2px",
-              padding: "0.4rem 0.6rem",
+              padding: "0.45rem",
               fontSize: "0.75rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              marginTop: "4px",
+              fontWeight: 700,
+              cursor: isLoading ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "0.35rem",
+              gap: "0.375rem",
             }}
           >
             {isLoading ? (
               <>
                 <Loader2 size={12} className="animate-spin" />
-                <span>Evaluating...</span>
+                <span>Computing Highway Routes...</span>
               </>
             ) : (
-              <span>Evaluate Route</span>
+              <>
+                <Navigation2 size={12} />
+                <span>Compute Routes</span>
+              </>
             )}
           </button>
         </form>
       </div>
 
-      {/* Standard Highway Corridors */}
-      <div style={{ marginTop: "0.625rem", paddingTop: "0.5rem", borderTop: "1px solid var(--border-light)" }}>
-        <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: "0.25rem" }}>
-          Standard Corridors
-        </div>
+      {/* Quick Corridor Buttons */}
+      <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "0.5rem" }}>
+        <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
+          Standard Highway Corridors
+        </span>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem" }}>
-          {STANDARD_CORRIDORS.map((r, idx) => (
+          {STANDARD_CORRIDORS.map((c, idx) => (
             <button
               key={idx}
               type="button"
-              onClick={() => handleQuickRoute(r)}
+              onClick={() => handleQuickRoute(c)}
               style={{
-                background: "var(--bg-card-subtle)",
+                background: "#f8fafc",
                 border: "1px solid var(--border-default)",
                 borderRadius: "2px",
-                padding: "0.15rem 0.35rem",
+                padding: "2px 5px",
                 fontSize: "0.625rem",
                 color: "var(--text-secondary)",
                 cursor: "pointer",
-                fontWeight: 500,
               }}
             >
-              {r.label}
+              {c.label}
             </button>
           ))}
         </div>

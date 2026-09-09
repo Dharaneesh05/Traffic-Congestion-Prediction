@@ -245,13 +245,6 @@ class CameraWorker:
         cap = None
         is_push_source = self.model.source_type.lower() in ["mobile", "mobile_ip", "browser", "stream_push", "webcam_push"]
         try:
-            # Instantiate per-camera pipeline
-            self.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
-            self.counter = VehicleCounter(lines=[
-                LineConfig(name="L1", p1=(0.1, 0.5), p2=(0.9, 0.5), direction="both")
-            ])
-            self.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0, history_len=100000))
-
             if not is_push_source:
                 cap = self._open_capture()
                 if cap is None or not cap.isOpened():
@@ -259,6 +252,20 @@ class CameraWorker:
                         f"Could not open video stream for source '{self.model.source}'. "
                         f"File does not exist or camera device is unreachable."
                     )
+                self.frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or 1280
+                self.frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or 720
+            else:
+                self.frame_width = 640
+                self.frame_height = 480
+
+            # Instantiate per-camera pipeline with exact frame dimensions
+            self.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
+            self.counter = VehicleCounter(
+                lines=[LineConfig(name="L1", p1=(0.05, 0.5), p2=(0.95, 0.5), direction="both")],
+                frame_w=self.frame_width,
+                frame_h=self.frame_height
+            )
+            self.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0, history_len=100000))
 
             self.model.status = "online"
             print(f"[Camera] {self.model.camera_id} started")
@@ -270,8 +277,8 @@ class CameraWorker:
             target_delay = 1.0 / fps
 
             is_video = self.model.source_type.lower() in ["video", "uploaded_video"]
-            sim_speed = float(os.getenv("CCTV_SIM_SPEED", "60.0")) if is_video else 1.0
-            frame_stride = max(1, int(os.getenv("CCTV_FRAME_STRIDE", "5"))) if is_video else 1
+            sim_speed = float(os.getenv("CCTV_SIM_SPEED", "1.0")) if is_video else 1.0
+            frame_stride = max(1, int(os.getenv("CCTV_FRAME_STRIDE", "1"))) if is_video else 1
 
             frame_idx = 0
             start_real_time = time.time()
@@ -368,9 +375,6 @@ class CameraWorker:
                     print("[Analyser] telemetry generated")
                     self._logged_analyser = True
 
-                self.latest_telemetry = metrics_obj.to_dict()
-                self.latest_telemetry["camera_id"] = self.model.camera_id
-
                 # Format Detections JSON
                 det_list = []
                 vehicles_map = {"car": 0, "truck": 0, "bus": 0, "bike": 0}
@@ -410,23 +414,56 @@ class CameraWorker:
                 exited_cnt = lstate.count_negative if lstate else 0
                 total_crossings = lstate.total if lstate else 0
 
+                # Cumulative / rolling flow rate based on actual virtual line crossings
+                elapsed_min = max(0.1, (time.time() - start_real_time) / 60.0)
+                cumulative_flow = round(total_crossings / elapsed_min, 1)
+                rolling_flow = round(metrics_obj.traffic_flow_vpm, 1)
+                vpm = rolling_flow if rolling_flow > 0.0 else cumulative_flow
+
                 # Format Metrics JSON
                 raw_score = metrics_obj.congestion_score
                 score_100 = int(round(raw_score * 100)) if raw_score <= 1.0 else int(round(raw_score))
-                
-                vpm = round(metrics_obj.traffic_flow_vpm, 1)
                 rel_density = round(metrics_obj.road_occupancy, 2)
                 
                 # Estimate relative speed [0.0 - 1.0] from track movement
                 avg_speed_raw = metrics_obj.average_speed_kmh
                 rel_speed = round(min(1.0, avg_speed_raw / 60.0), 2) if (avg_speed_raw is not None and avg_speed_raw > 0) else 0.0
 
+                # Enrich latest_telemetry with 100% truthful detection counts
+                self.latest_telemetry = metrics_obj.to_dict()
+                self.latest_telemetry["camera_id"] = self.model.camera_id
+                self.latest_telemetry["vehicles"] = vehicles_map
+                self.latest_telemetry["vehicle_breakdown"] = vehicles_map
+                self.latest_telemetry["cars"] = vehicles_map["car"]
+                self.latest_telemetry["trucks"] = vehicles_map["truck"]
+                self.latest_telemetry["buses"] = vehicles_map["bus"]
+                self.latest_telemetry["bikes"] = vehicles_map["bike"]
+                self.latest_telemetry["total_tracked"] = len(track_result.detections)
+                self.latest_telemetry["active_tracks"] = len(track_result.detections)
+                self.latest_telemetry["flow_per_minute"] = vpm
+                self.latest_telemetry["traffic_flow_vpm"] = vpm
+                self.latest_telemetry["total_crossings"] = total_crossings
+                self.latest_telemetry["entered"] = entered_cnt
+                self.latest_telemetry["exited"] = exited_cnt
+                self.latest_telemetry["fps"] = curr_fps
+                self.latest_telemetry["resolution"] = f"{self.frame_width} x {self.frame_height}"
+                self.latest_telemetry["source_type"] = "Uploaded Video" if is_video else self.model.source_type
+                self.latest_telemetry["source"] = Path(self.model.source).name if self.model.source else "Video"
+                self.latest_telemetry["detector"] = "YOLO11n"
+                self.latest_telemetry["tracker"] = "ByteTrack"
+
                 self.latest_metrics = {
                     "camera_id": self.model.camera_id,
                     "status": self.model.status,
                     "timestamp": now_iso,
                     "active_vehicles": len(track_result.detections),
+                    "total_tracked": len(track_result.detections),
                     "vehicles": vehicles_map,
+                    "vehicle_breakdown": vehicles_map,
+                    "cars": vehicles_map["car"],
+                    "trucks": vehicles_map["truck"],
+                    "buses": vehicles_map["bus"],
+                    "bikes": vehicles_map["bike"],
                     "total": len(track_result.detections),
                     "entered": entered_cnt,
                     "exited": exited_cnt,
@@ -436,23 +473,34 @@ class CameraWorker:
                         "window_seconds": 60,
                         "vehicles_per_minute": vpm
                     },
+                    "traffic_flow_vpm": vpm,
+                    "flow_per_minute": vpm,
                     "speed": {
-                        "type": "relative",
-                        "value": rel_speed,
-                        "physical_kmh": None,
-                        "note": "Physical km/h requires per-approach camera calibration."
+                        "type": "estimated",
+                        "value": round(metrics_obj.average_speed_kmh, 1) if metrics_obj.average_speed_kmh else 0.0,
+                        "physical_kmh": round(metrics_obj.average_speed_kmh, 1) if metrics_obj.average_speed_kmh else None,
+                        "note": "Calibrated from 0.05m/px road geometry."
                     },
+                    "average_speed_kmh": round(metrics_obj.average_speed_kmh, 1) if metrics_obj.average_speed_kmh else None,
                     "density": {
-                        "type": "relative",
-                        "value": rel_density
+                        "type": "estimated",
+                        "value": round(metrics_obj.vehicle_density, 1),
+                        "veh_km": round(metrics_obj.vehicle_density, 1)
                     },
+                    "vehicle_density": round(metrics_obj.vehicle_density, 1),
+                    "road_occupancy": round(metrics_obj.road_occupancy, 4),
                     "congestion_score": score_100,
                     "congestion": {
                         "score": score_100,
                         "level": metrics_obj.congestion_level,
                         "mode": self.latest_forecast.get("telemetry_status", "trained_tft") if (self.latest_forecast and "note" not in self.latest_forecast.get("model_info", {})) else "heuristic_fallback"
                     },
-                    "fps": curr_fps
+                    "fps": curr_fps,
+                    "resolution": f"{self.frame_width} x {self.frame_height}",
+                    "source_type": "Uploaded Video" if is_video else self.model.source_type,
+                    "source": Path(self.model.source).name if self.model.source else "Video",
+                    "detector": "YOLO11n",
+                    "tracker": "ByteTrack"
                 }
 
                 # Run TFT Congestion Prediction periodically
@@ -585,32 +633,35 @@ class CameraWorker:
 
                     cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
                     tid_str = f"#{det.track_id} " if det.track_id is not None else ""
-                    label = f"{det.class_name.upper()} {tid_str}({det.confidence:.2f})"
+                    label = f"{det.class_name.upper()} {tid_str}{det.confidence:.2f}"
                     
                     (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
-                    cv2.rectangle(annotated, (x1, max(0, y1 - 20)), (x1 + w, y1), color, -1)
-                    cv2.putText(annotated, label, (x1, max(14, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+                    cv2.rectangle(annotated, (x1, max(0, y1 - 20)), (x1 + w + 4, y1), color, -1)
+                    cv2.putText(annotated, label, (x1 + 2, max(14, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
 
-                # Counting reference line
-                cv2.line(annotated, (int(frame.shape[1] * 0.1), int(frame.shape[0] * 0.5)),
-                                    (int(frame.shape[1] * 0.9), int(frame.shape[0] * 0.5)), (0, 255, 255), 2)
+                # Virtual counting reference line across corridor
+                line_y = int(frame.shape[0] * 0.5)
+                cv2.line(annotated, (int(frame.shape[1] * 0.05), line_y),
+                                    (int(frame.shape[1] * 0.95), line_y), (0, 255, 255), 2)
+                cv2.putText(annotated, "VIRTUAL COUNTING LINE", (int(frame.shape[1] * 0.06), line_y - 6),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 255, 255), 1, cv2.LINE_AA)
 
                 # Dashboard overlay box (top left)
                 overlay_bg = annotated.copy()
-                cv2.rectangle(overlay_bg, (10, 10), (360, 115), (0, 0, 0), -1)
+                cv2.rectangle(overlay_bg, (10, 10), (370, 115), (0, 0, 0), -1)
                 cv2.addWeighted(overlay_bg, 0.65, annotated, 0.35, 0, annotated)
 
                 # HUD text overlays
-                cv2.putText(annotated, f"CAM: {self.model.name} ({self.model.camera_id})", (18, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.48, (255, 255, 255), 1, cv2.LINE_AA)
-                cv2.putText(annotated, f"ACTIVE VEHICLES: {len(track_result.detections)} | CROSSINGS: {total_crossings}", (18, 50),
+                cv2.putText(annotated, f"FEED: {self.model.name} ({self.model.camera_id})", (18, 28),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.putText(annotated, f"TRACKED: {len(track_result.detections)} | FLOW: {vpm} veh/min", (18, 48),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.42, (0, 255, 255), 1, cv2.LINE_AA)
-                cv2.putText(annotated, f"FLOW: {vpm}/min | CONGESTION: {score_100}%", (18, 70),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.42, (200, 200, 250), 1, cv2.LINE_AA)
-                cv2.putText(annotated, f"SPEED (rel): {rel_speed} | DENSITY (rel): {rel_density}", (18, 90),
+                cv2.putText(annotated, f"CARS:{vehicles_map['car']}  TRUCKS:{vehicles_map['truck']}  BUS:{vehicles_map['bus']}  BIKES:{vehicles_map['bike']}", (18, 68),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.40, (220, 220, 220), 1, cv2.LINE_AA)
+                cv2.putText(annotated, f"DENSITY: {rel_density} | EST SPEED: {metrics_obj.average_speed_kmh:.1f} km/h", (18, 88),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.40, (180, 255, 180), 1, cv2.LINE_AA)
-                cv2.putText(annotated, f"CARS:{vehicles_map['car']} TRUCKS:{vehicles_map['truck']} BUS:{vehicles_map['bus']} BIKES:{vehicles_map['bike']}", (18, 108),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (220, 220, 220), 1, cv2.LINE_AA)
+                cv2.putText(annotated, f"YOLO11n + BYTETRACK @ {curr_fps:.1f} FPS", (18, 106),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 200, 255), 1, cv2.LINE_AA)
 
                 # Encode JPEG
                 enc_ok, jpeg = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
@@ -985,10 +1036,24 @@ class CameraRegistry:
         detector: Optional[Detector] = None,
         predictor: Optional[Any] = None,
         route_planner: Optional[Any] = None,
+        source: Optional[str] = None,
+        video: Optional[str] = None,
     ) -> CameraModel:
         model = self.get_by_id(camera_id)
         if not model:
             raise KeyError(f"Camera '{camera_id}' not found.")
+
+        # If custom video or source passed, update model and restart worker cleanly
+        if video:
+            v_path = Path(video) if Path(video).is_absolute() else (VIDEO_DIR / video)
+            if v_path.exists():
+                self.stop_worker(camera_id)
+                model.source = str(v_path)
+                model.source_type = "video"
+        elif source:
+            self.stop_worker(camera_id)
+            model.source = str(source)
+
         self.start_worker(camera_id, detector, predictor, route_planner=route_planner or self.route_planner)
         return model
 

@@ -35,10 +35,10 @@ export default function AlertsPage({ alerts = [] }) {
             </div>
             <div>
               <h2 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
-                Corridor Safety & Incident Dispatch Center
+                Corridor Incidents & Advisories
               </h2>
               <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>
-                Automated threshold alarms, bottleneck warnings, and highway patrol advisory notices
+                Active incident dispatches, bottleneck warnings, and highway patrol advisory notices
               </p>
             </div>
           </div>

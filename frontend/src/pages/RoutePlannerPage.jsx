@@ -77,6 +77,8 @@ export default function RoutePlannerPage({
             routeResult={routeResult}
             activeStrategy={activeStrategy}
             cameraTelemetry={cameraTelemetry}
+            fromLocation={fromLocation}
+            toLocation={toLocation}
             isFullPage={true}
           />
         </div>

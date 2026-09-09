@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import CCTVPanel from "../components/CCTVPanel";
 import { Video, Camera, Activity, Smartphone, Globe, Radio } from "lucide-react";
+import { getCameraTelemetry } from "../api";
 
 export default function CCTVCamerasPage({
   telemetry,
@@ -10,15 +11,38 @@ export default function CCTVCamerasPage({
   onStopCamera,
 }) {
   const [activeCamId, setActiveCamId] = useState("CCTV-SKG-01");
+  const [pageTelemetry, setPageTelemetry] = useState(telemetry);
   const isOnline = cameraStatus === "online";
+
+  useEffect(() => {
+    if (telemetry) setPageTelemetry(telemetry);
+  }, [telemetry]);
+
+  useEffect(() => {
+    if (!isOnline) {
+      setPageTelemetry(null);
+      return;
+    }
+    const interval = setInterval(async () => {
+      try {
+        const res = await getCameraTelemetry(activeCamId);
+        if (res?.telemetry) {
+          setPageTelemetry(res.telemetry);
+        }
+      } catch (e) {}
+    }, 800);
+    return () => clearInterval(interval);
+  }, [isOnline, activeCamId]);
+
+  const effTel = pageTelemetry || telemetry;
 
   const camerasList = [
     { id: "CCTV-SKG-01", name: "Sankagiri Junction", type: "Video (Traffic.mp4)", highway: "NH544 Inflow", status: isOnline && activeCamId === "CCTV-SKG-01" ? "online" : "standby" },
-    { id: "CCTV-SLM-01", name: "Salem Bus Stand Area", type: "Video (Traffic2.mp4)", highway: "Salem Radial", status: "standby" },
-    { id: "CCTV-ERD-01", name: "Erode Junction Hub", type: "Video (Traffic3.mp4)", highway: "SH15 Link", status: "standby" },
+    { id: "CCTV-SLM-01", name: "Salem Bus Stand Area", type: "Video (Traffic2.mp4)", highway: "Salem Radial", status: isOnline && activeCamId === "CCTV-SLM-01" ? "online" : "standby" },
+    { id: "CCTV-ERD-01", name: "Erode Junction Hub", type: "Video (Traffic3.mp4)", highway: "SH15 Link", status: isOnline && activeCamId === "CCTV-ERD-01" ? "online" : "standby" },
     { id: "CCTV-MOBILE-01", name: "Mobile Phone Cam (LAN)", type: "Mobile Push Stream", highway: "Dynamic Patrol", status: isOnline && activeCamId === "CCTV-MOBILE-01" ? "online" : "standby" },
     { id: "CCTV-WEBCAM-01", name: "Operator Workstation Cam", type: "PC WebCam Capture", highway: "Control Center", status: isOnline && activeCamId === "CCTV-WEBCAM-01" ? "online" : "standby" },
-    { id: "CCTV-IP-01", name: "Corridor RTSP Stream", type: "IP / RTSP Network", highway: "NH544 Toll Plaza", status: "standby" },
+    { id: "CCTV-IP-01", name: "Corridor RTSP Stream", type: "IP / RTSP Network", highway: "NH544 Toll Plaza", status: isOnline && activeCamId === "CCTV-IP-01" ? "online" : "standby" },
   ];
 
   return (
@@ -105,7 +129,7 @@ export default function CCTVCamerasPage({
       <div style={{ display: "grid", gridTemplateColumns: "1.15fr 0.85fr", gap: "1.25rem" }}>
         {/* Left: CCTV Live Video Feed & Controls */}
         <CCTVPanel
-          telemetry={telemetry}
+          telemetry={effTel}
           cameraStatus={cameraStatus}
           onStartCamera={onStartCamera}
           onStopCamera={onStopCamera}
@@ -129,23 +153,40 @@ export default function CCTVCamerasPage({
               </div>
 
               <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Ingestion Protocol</span>
-                <strong>{camerasList.find(c => c.id === activeCamId)?.type}</strong>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Active Video / Source</span>
+                <strong>{isOnline ? (effTel?.source || camerasList.find(c => c.id === activeCamId)?.type) : "Standby (No Video Running)"}</strong>
               </div>
 
               <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Frame Parameters</span>
-                <strong>1280×720 Resolution @ 30.0 FPS Buffer</strong>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Resolution</span>
+                <strong>{isOnline && effTel?.resolution ? effTel.resolution : (isOnline ? "1280 × 720" : "--")}</strong>
               </div>
 
               <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Ground Calibration</span>
-                <strong>0.05 metres/pixel • 500 m² Calibrated Highway ROI</strong>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Frame Rate</span>
+                <strong>{isOnline && effTel?.fps != null ? `${effTel.fps} FPS` : (isOnline ? "30.0 FPS" : "--")}</strong>
               </div>
 
               <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Neural Pipeline</span>
-                <strong>YOLO11n Detector + ByteTrack Object Tracking + TFT Forecaster</strong>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Neural Model</span>
+                <strong>{effTel?.detector || "YOLO11n"} (Ultralytics)</strong>
+              </div>
+
+              <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Multi-Object Tracker</span>
+                <strong>{effTel?.tracker || "ByteTrack"} (Kalman Filter + Hungarian)</strong>
+              </div>
+
+              <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Detection Status</span>
+                <strong style={{ color: isOnline ? "#15803d" : "#64748b" }}>
+                  {isOnline ? "Running" : "Idle"}
+                </strong>
+              </div>
+
+              <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
+                <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Confidence Threshold</span>
+                <strong>0.25 (IoU 0.45)</strong>
               </div>
             </div>
           </div>

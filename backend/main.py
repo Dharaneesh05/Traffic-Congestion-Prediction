@@ -1107,14 +1107,27 @@ async def delete_camera(camera_id: str):
 # ── 6. POST /api/cameras/{camera_id}/start ──
 @app.post("/api/cameras/{camera_id}/start")
 @app.post("/api/camera/{camera_id}/start")
-async def start_camera_endpoint(camera_id: str):
+async def start_camera_endpoint(camera_id: str, request: Request = None):
     """Start background processing thread for a specific camera feed."""
     try:
+        video = None
+        source = None
+        if request:
+            try:
+                body = await request.json()
+                if isinstance(body, dict):
+                    video = body.get("video")
+                    source = body.get("source")
+            except Exception:
+                pass
+
         model = camera_registry.start_camera(
             camera_id,
             detector=app_state.detector,
             predictor=app_state.predictor,
             route_planner=app_state.route_planner,
+            source=source,
+            video=video,
         )
         return {"message": f"Camera '{model.camera_id}' ({model.name}) started successfully.", "camera": model.to_dict()}
     except KeyError:
@@ -1319,10 +1332,28 @@ async def get_camera_telemetry_endpoint(camera_id: str):
         }
 
     if worker.latest_telemetry:
+        tel = dict(worker.latest_telemetry)
+        if worker.latest_metrics:
+            for k, v in worker.latest_metrics.items():
+                if k not in tel:
+                    tel[k] = v
+        if "vehicles" in tel and isinstance(tel["vehicles"], dict):
+            tel.setdefault("cars", tel["vehicles"].get("car", 0))
+            tel.setdefault("trucks", tel["vehicles"].get("truck", 0))
+            tel.setdefault("buses", tel["vehicles"].get("bus", 0))
+            tel.setdefault("bikes", tel["vehicles"].get("bike", tel["vehicles"].get("motorcycle", 0)))
+            tel.setdefault("vehicle_breakdown", tel["vehicles"])
+        elif "class_counts" in tel and isinstance(tel["class_counts"], dict):
+            tel.setdefault("cars", tel["class_counts"].get("car", 0))
+            tel.setdefault("trucks", tel["class_counts"].get("truck", 0))
+            tel.setdefault("buses", tel["class_counts"].get("bus", 0))
+            tel.setdefault("bikes", tel["class_counts"].get("bike", tel["class_counts"].get("motorcycle", 0)))
+            tel.setdefault("vehicles", tel["class_counts"])
+            tel.setdefault("vehicle_breakdown", tel["class_counts"])
         return {
             "status": "online",
             "camera_id": model.camera_id,
-            "telemetry": worker.latest_telemetry
+            "telemetry": tel
         }
 
     return {

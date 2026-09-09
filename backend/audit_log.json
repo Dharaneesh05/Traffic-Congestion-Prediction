@@ -1,5 +1,509 @@
 [
   {
+    "entry_id": "AUD_1788961689954_3284b6",
+    "timestamp": 1788961689.9542327,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1788961689",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1788946855399_e7d700",
+    "timestamp": 1788946855.3999355,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1788946855",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1788939222472_a24733",
+    "timestamp": 1788939222.472813,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1788939222",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1788879718968_3c9d57",
+    "timestamp": 1788879718.969642,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-8960",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Vedaranyam Main Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878017655_1c279b",
+    "timestamp": 1788878017.6557627,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-7647",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878016418_13ca9e",
+    "timestamp": 1788878016.4187522,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-6411",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878011476_054870",
+    "timestamp": 1788878011.476598,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-1468",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878011254_fb3d1d",
+    "timestamp": 1788878011.2542748,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-1245",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878011117_1a3d15",
+    "timestamp": 1788878011.1178298,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-1109",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878010988_826b68",
+    "timestamp": 1788878010.9887064,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-0979",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878010865_5cb9a6",
+    "timestamp": 1788878010.8651567,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-0856",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878010154_9e0016",
+    "timestamp": 1788878010.1570816,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-0141",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878010005_362894",
+    "timestamp": 1788878010.0056317,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-9996",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878009868_9c865d",
+    "timestamp": 1788878009.868671,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-9860",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878009727_c403e9",
+    "timestamp": 1788878009.727463,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-9717",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878009581_c0d623",
+    "timestamp": 1788878009.5813575,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-9573",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878009372_ead77d",
+    "timestamp": 1788878009.372929,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-9364",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878008821_c24b69",
+    "timestamp": 1788878008.8218226,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-8812",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878008476_e38806",
+    "timestamp": 1788878008.4761498,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-8466",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878007664_cea212",
+    "timestamp": 1788878007.6648586,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-7657",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878006843_99bfb6",
+    "timestamp": 1788878006.8437765,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-6834",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878006225_aecc42",
+    "timestamp": 1788878006.2256935,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-6217",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878004710_adbcba",
+    "timestamp": 1788878004.710587,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-4702",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878003307_9532a6",
+    "timestamp": 1788878003.3072267,
+    "action": "OFFICER_ACCEPT_DIVERSION",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACCEPT_DIVERSION-3298",
+      "action": "ACCEPT_DIVERSION",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788878000666_b159d1",
+    "timestamp": 1788878000.6660397,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-0657",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877999507_164763",
+    "timestamp": 1788877999.5076783,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-9497",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877976133_4c6e32",
+    "timestamp": 1788877976.1333668,
+    "action": "OFFICER_NOTIFY_UNIT",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-NOTIFY_UNIT-6124",
+      "action": "NOTIFY_UNIT",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877973033_7236a3",
+    "timestamp": 1788877973.033386,
+    "action": "OFFICER_ACCEPT_DIVERSION",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACCEPT_DIVERSION-3025",
+      "action": "ACCEPT_DIVERSION",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877970864_cf291d",
+    "timestamp": 1788877970.8657253,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-0854",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for Five Roads Junction",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877684967_3496bf",
+    "timestamp": 1788877684.9679923,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_042",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-7250",
+      "action": "ACKNOWLEDGE",
+      "notes": "Action 'ACKNOWLEDGE' dispatched from Police Officer Mobile App.",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877597260_5f431d",
+    "timestamp": 1788877597.2608995,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-7250",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for ALERT",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877588516_e7debe",
+    "timestamp": 1788877588.5167634,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-7739",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for ALERT",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877586460_bba3b1",
+    "timestamp": 1788877586.4606097,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-6451",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for ALERT",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788877583937_54ac8a",
+    "timestamp": 1788877583.9418733,
+    "action": "OFFICER_ACKNOWLEDGE",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "ALT-ACKNOWLEDGE-3926",
+      "action": "ACKNOWLEDGE",
+      "notes": "Officer dispatch for ALERT",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1788875827489_ddc26a",
+    "timestamp": 1788875827.4897025,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1788875827",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1788875195033_190849",
+    "timestamp": 1788875195.0335953,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1788875195",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
     "entry_id": "AUD_1788637098269_38fc85",
     "timestamp": 1788637098.2698264,
     "action": "ALERT_GENERATED",

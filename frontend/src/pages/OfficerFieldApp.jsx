@@ -17,7 +17,7 @@ import {
   Shield, AlertTriangle, CheckCircle2, XCircle, Bell,
   Radio, MapPin, Navigation, ArrowRight, RefreshCw,
   Clock, Activity, Gauge, Users, ChevronRight, Share2,
-  Check, PhoneCall, Volume2, Info, ChevronDown
+  Check, PhoneCall, Volume2, Info, ChevronDown, Video
 } from "lucide-react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import L from "leaflet";
@@ -27,7 +27,8 @@ import {
   getJunctionOverview,
   getAlerts,
   sendOfficerAction,
-  calculateDiversion
+  calculateDiversion,
+  getStreamUrl
 } from "../api";
 
 // Fix leaflet marker icon paths
@@ -68,6 +69,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
   const [processingAction, setProcessingAction] = useState(false);
   const [selectedApproach, setSelectedApproach] = useState("APP_NORTH");
   const [expandedPolicy, setExpandedPolicy] = useState(false);
+  const [showLiveCamera, setShowLiveCamera] = useState(false);
 
   // Poll junction & alert status
   const refreshData = async () => {
@@ -120,9 +122,9 @@ export default function OfficerFieldApp({ onSwitchMode }) {
       toastTitle = "✕ Recommendation REJECTED: Manual officer intervention active.";
     } else if (actionType === "RESOLVE") {
       updatedStatus = "RESOLVED";
-      toastTitle = "✓ Congestion MARKED RESOLVED: Normal free-flow restored.";
+      toastTitle = "✓ Clearance REPORTED: Nominal corridor flow restored.";
     } else if (actionType === "NOTIFY") {
-      toastTitle = "📢 BROADCAST SENT: 4 nearby patrol units alerted to assist.";
+      toastTitle = "📢 PATROL / TOW REQUESTED: Nearest highway response units dispatched.";
     }
 
     if (activeAlert) {
@@ -324,13 +326,54 @@ export default function OfficerFieldApp({ onSwitchMode }) {
             </div>
           </div>
 
-          {/* AI Decision Support Recommendation */}
+          {/* Quick Access to Live Camera Feed */}
+          <div className="section-block">
+            <div className="flex items-center justify-between mb-2">
+              <span className="section-heading">Assigned Corridor Camera</span>
+              <button
+                onClick={() => setShowLiveCamera(!showLiveCamera)}
+                style={{
+                  background: showLiveCamera ? "#0f172a" : "#eff6ff",
+                  color: showLiveCamera ? "#ffffff" : "#2563eb",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: "4px",
+                  padding: "3px 8px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <Video size={12} />
+                <span>{showLiveCamera ? "Hide Camera" : "View Live Stream"}</span>
+              </button>
+            </div>
+            {showLiveCamera && (
+              <div style={{ position: "relative", width: "100%", height: "200px", background: "#000000", borderRadius: "10px", overflow: "hidden" }}>
+                <img
+                  src={getStreamUrl()}
+                  alt="Live Corridor Camera"
+                  style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+                <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(0,0,0,0.7)", padding: "2px 6px", borderRadius: "3px", color: "#fff", fontSize: "10px", fontWeight: 700 }}>
+                  CAM001 • LIVE NH544 APPROACH
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Diversion Recommendation */}
           {currentPlan ? (
             <div className="ai-rec-card">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-800">
                   <Navigation size={15} />
-                  <span>AI DIVERSION RECOMMENDATION</span>
+                  <span>DIVERSION RECOMMENDATION</span>
                 </div>
                 <span className="confidence-pill">{currentPlan.confidence}% Confidence</span>
               </div>
@@ -427,7 +470,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
                 onClick={() => handleAction("REJECT")}
               >
                 <XCircle size={14} />
-                <span>Override / Reject</span>
+                <span>Override</span>
               </button>
               <button
                 id="btn-officer-resolve"
@@ -436,7 +479,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
                 onClick={() => handleAction("RESOLVE")}
               >
                 <CheckCircle2 size={14} />
-                <span>Mark Resolved</span>
+                <span>Report Clearance</span>
               </button>
               <button
                 id="btn-officer-notify"
@@ -445,7 +488,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
                 onClick={() => handleAction("NOTIFY")}
               >
                 <Share2 size={14} />
-                <span>Notify Units</span>
+                <span>Request Patrol/Tow</span>
               </button>
             </div>
           </div>

@@ -10,6 +10,8 @@ export default function LiveTrafficMapPage({
   onPlanRoute,
   locations = [],
   selectedLocation = null,
+  fromLocation = null,
+  toLocation = null,
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
@@ -18,6 +20,8 @@ export default function LiveTrafficMapPage({
         activeStrategy={activeStrategy}
         cameraTelemetry={telemetry}
         selectedLocation={selectedLocation}
+        fromLocation={fromLocation}
+        toLocation={toLocation}
         isFullPage={true}
       />
     </div>

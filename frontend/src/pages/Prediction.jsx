@@ -107,10 +107,10 @@ export default function Prediction() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Brain size={16} color="var(--accent-purple)" />
-            <span className="text-xs text-muted uppercase tracking-wider font-bold">AI Prediction</span>
+            <span className="text-xs text-muted uppercase tracking-wider font-bold">Traffic Forecasting</span>
           </div>
-          <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 800 }}>TFT Congestion Forecast</h2>
-          <div className="text-sm text-muted mt-1">Temporal Fusion Transformer · Multi-horizon uncertainty quantification</div>
+          <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 800 }}>Congestion Forecast & Trends</h2>
+          <div className="text-sm text-muted mt-1">Multi-horizon congestion forecasts and confidence intervals</div>
         </div>
         {modelInfo && (
           <div className="glass-card-flat" style={{ padding: "0.625rem 1rem" }}>
