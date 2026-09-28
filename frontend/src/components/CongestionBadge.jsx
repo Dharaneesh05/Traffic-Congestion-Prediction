@@ -4,11 +4,11 @@
  */
 
 const LEVEL_CONFIG = {
-  FREE_FLOW: { label: "Free Flow", className: "badge-success", dot: "#10b981" },
-  LIGHT:     { label: "Light",     className: "badge-success", dot: "#34d399" },
-  MODERATE:  { label: "Moderate",  className: "badge-warning", dot: "#f59e0b" },
-  HEAVY:     { label: "Heavy",     className: "badge-orange",  dot: "#f97316" },
-  CONGESTED: { label: "Congested", className: "badge-danger",  dot: "#ef4444" },
+  FREE_FLOW: { label: "Free Flow", className: "badge-success", dot: "var(--status-normal, #22C55E)" },
+  LIGHT:     { label: "Light",     className: "badge-success", dot: "var(--status-normal, #22C55E)" },
+  MODERATE:  { label: "Moderate",  className: "badge-warning", dot: "var(--status-moderate, #C2BB91)" },
+  HEAVY:     { label: "Heavy",     className: "badge-orange",  dot: "var(--status-high, #F59E0B)" },
+  CONGESTED: { label: "Congested", className: "badge-danger",  dot: "var(--status-critical, #F45E70)" },
 };
 
 export default function CongestionBadge({ level, score, showScore = false }) {

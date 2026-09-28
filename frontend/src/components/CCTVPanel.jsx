@@ -1,47 +1,37 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  Video,
-  Play,
-  Square,
-  Upload,
-  Camera,
-  Smartphone,
-  Globe,
-  Loader2,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle
-} from "lucide-react";
-import { getStreamUrl, getBackendHost, getVideosList, uploadVideoFile, startCamera, stopCamera, pushFrameBytes, getCameraTelemetry } from "../api";
+import React, { useState, useEffect, useMemo } from "react";
+import { Loader2, Upload } from "lucide-react";
+import { getStreamUrl, getVideosList, uploadVideoFile, getCameraTelemetry, startCameraAnalysis, stopCameraAnalysis } from "../api";
+import { trafficService } from "../services/trafficService";
 
 export default function CCTVPanel({
   telemetry,
   cameraStatus,
   onStartCamera,
   onStopCamera,
+  onStartAnalysis,
+  onStopAnalysis,
   isLoadingAction = false,
   activeCameraId = "CCTV-SKG-01",
   onSelectCamera,
   selectedJunction = null,
+  onTelemetryUpdate = null,
+  areaJunctions = [],
+  onSelectJunction = null,
 }) {
-  const [sourceMode, setSourceMode] = useState("video"); // "video" | "ip" | "mobile" | "webcam" | "nearby"
+  const [sourceMode, setSourceMode] = useState("video"); // "video" | "ip"
   const [videoList, setVideoList] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState("Traffic.mp4");
-  const [rtspUrl, setRtspUrl] = useState("rtsp://demo:demo@192.168.1.100:554/stream1");
+  const [rtspUrl, setRtspUrl] = useState("rtsp://10.161.12.181:1945/");
+  const [urlError, setUrlError] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [localVideoUrl, setLocalVideoUrl] = useState(null);
   const [streamError, setStreamError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [streamNonce, setStreamNonce] = useState(Date.now());
   const [liveTelemetry, setLiveTelemetry] = useState(telemetry);
-  const [webcamActive, setWebcamActive] = useState(false);
-  const [webcamStatus, setWebcamStatus] = useState("idle");
-
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const webcamIntervalRef = useRef(null);
+  const [analysisActive, setAnalysisActive] = useState(false);
+  const [isStartingAnalysis, setIsStartingAnalysis] = useState(false);
 
   const isOnline = cameraStatus === "online";
-  const lanIp = getBackendHost();
 
   // Keep liveTelemetry synced with parent telemetry when provided
   useEffect(() => {
@@ -53,24 +43,34 @@ export default function CCTVPanel({
     if (!isOnline) {
       setLiveTelemetry(null);
       setStreamError(false);
+      setAnalysisActive(false);
       return;
     }
     const interval = setInterval(async () => {
       try {
         const res = await getCameraTelemetry(activeCameraId);
+        if (res?.is_analyzing !== undefined) {
+          setAnalysisActive(Boolean(res.is_analyzing));
+        } else if (res?.telemetry) {
+          setAnalysisActive(true);
+        }
         if (res?.telemetry) {
           setLiveTelemetry(res.telemetry);
+          if (onTelemetryUpdate) onTelemetryUpdate(res.telemetry);
+        } else if (res && res.is_analyzing === false) {
+          setLiveTelemetry(null);
         }
       } catch (e) {}
     }, 750);
     return () => clearInterval(interval);
   }, [isOnline, activeCameraId]);
 
-  // Reset stream nonce when camera becomes online or changes
+  // Reset stream nonce and retry count when camera becomes online or changes
   useEffect(() => {
     if (isOnline) {
       setStreamNonce(Date.now());
       setStreamError(false);
+      setRetryCount(0);
     }
   }, [isOnline, activeCameraId]);
 
@@ -83,76 +83,46 @@ export default function CCTVPanel({
       .catch(() => {});
   }, []);
 
-  // WebCam Browser Streaming Loop
-  const startBrowserWebcam = async () => {
-    try {
-      setWebcamStatus("requesting");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 } },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setWebcamActive(true);
-      setWebcamStatus("streaming");
-
-      // Register and start CCTV-WEBCAM-01
-      await startCamera("CCTV-WEBCAM-01").catch(() => {});
-      if (onSelectCamera) onSelectCamera("CCTV-WEBCAM-01");
-
-      // Frame push interval (10 FPS)
-      const canvas = canvasRef.current || document.createElement("canvas");
-      canvas.width = 640;
-      canvas.height = 480;
-      const ctx = canvas.getContext("2d");
-
-      webcamIntervalRef.current = setInterval(() => {
-        if (videoRef.current && videoRef.current.readyState >= 2) {
-          ctx.drawImage(videoRef.current, 0, 0, 640, 480);
-          canvas.toBlob(
-            (blob) => {
-              if (blob) {
-                blob.arrayBuffer().then((buf) => {
-                  pushFrameBytes("CCTV-WEBCAM-01", new Uint8Array(buf)).catch(() => {});
-                });
-              }
-            },
-            "image/jpeg",
-            0.7
-          );
+  // Auto start camera feed whenever activeCameraId or selectedJunction changes
+  useEffect(() => {
+    let active = true;
+    const autoInit = async () => {
+      if (!onStartCamera) return;
+      try {
+        let chosenVideo = selectedVideo || "Traffic.mp4";
+        const vData = await getVideosList().catch(() => null);
+        if (vData?.videos && vData.videos.length > 0) {
+          if (active) setVideoList(vData.videos);
+          const list = vData.videos.map((v) => (typeof v === "string" ? v : v.filename));
+          const jName = (selectedJunction?.name || "").toLowerCase();
+          const cId = (activeCameraId || "").toLowerCase();
+          const matched = list.find((v) => {
+            const vl = v.toLowerCase();
+            return (jName && vl.includes(jName)) || (cId && vl.includes(cId));
+          });
+          if (matched) chosenVideo = matched;
+          else {
+            const num = (activeCameraId || "").match(/\d+/);
+            const idx = num ? parseInt(num[0], 10) - 1 : 0;
+            chosenVideo = list[Math.abs(idx) % list.length] || "Traffic.mp4";
+          }
+          if (active) setSelectedVideo(chosenVideo);
         }
-      }, 100);
-    } catch (err) {
-      console.error("Webcam access error:", err);
-      setWebcamStatus("error");
-    }
-  };
-
-  const stopBrowserWebcam = () => {
-    if (webcamIntervalRef.current) {
-      clearInterval(webcamIntervalRef.current);
-      webcamIntervalRef.current = null;
-    }
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks();
-      tracks.forEach((t) => t.stop());
-      videoRef.current.srcObject = null;
-    }
-    setWebcamActive(false);
-    setWebcamStatus("idle");
-    stopCamera("CCTV-WEBCAM-01").catch(() => {});
-  };
+        await onStartCamera(activeCameraId, { video: chosenVideo, auto_analysis: true });
+      } catch (e) {
+        console.warn("Auto-start camera notice:", e);
+      }
+    };
+    autoInit();
+    return () => {
+      active = false;
+    };
+  }, [activeCameraId, selectedJunction]);
 
   // Video File Upload Handler
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    try {
-      const objUrl = URL.createObjectURL(file);
-      setLocalVideoUrl(objUrl);
-    } catch (e) {}
 
     setIsUploading(true);
     const formData = new FormData();
@@ -167,8 +137,9 @@ export default function CCTVPanel({
         if (vData?.videos) setVideoList(vData.videos);
         if (onStartCamera) {
           setStreamError(false);
+          setRetryCount(0);
           setStreamNonce(Date.now());
-          onStartCamera(res.camera_id, { video: file.name });
+          onStartCamera(res.camera_id, { video: file.name, auto_analysis: true });
         }
       }
     } catch (err) {
@@ -182,282 +153,375 @@ export default function CCTVPanel({
     setSelectedVideo(newVideo);
     if (isOnline && onStartCamera) {
       setStreamError(false);
+      setRetryCount(0);
       setStreamNonce(Date.now());
-      onStartCamera(activeCameraId, { video: newVideo });
+      onStartCamera(activeCameraId, { video: newVideo, auto_analysis: true });
     }
   };
 
-  const handleStartAnalysis = () => {
+  const handleStartCamera = async () => {
     setStreamError(false);
+    setRetryCount(0);
+    setUrlError("");
     setStreamNonce(Date.now());
+    if (sourceMode === "video") {
+      setAnalysisActive(true);
+    }
     if (onStartCamera) {
       if (sourceMode === "video") {
-        onStartCamera(activeCameraId, { video: selectedVideo });
+        try {
+          await onStartCamera(activeCameraId, { video: selectedVideo, auto_analysis: true });
+        } catch (err) {
+          console.error("Video camera start failed:", err);
+        }
       } else if (sourceMode === "ip") {
-        onStartCamera(activeCameraId, { source: rtspUrl });
+        const trimmed = rtspUrl.trim();
+        if (!trimmed.toLowerCase().startsWith("rtsp://") && !trimmed.toLowerCase().startsWith("rtsps://")) {
+          setUrlError("Invalid RTSP URL. Must begin with rtsp://");
+          return;
+        }
+        try {
+          await onStartCamera(activeCameraId, { source: trimmed, source_type: "rtsp", auto_analysis: true });
+        } catch (err) {
+          console.error("RTSP camera start failed:", err);
+          setUrlError(err?.message || "Failed to connect to RTSP camera stream.");
+        }
       } else {
-        onStartCamera(activeCameraId);
+        try {
+          await onStartCamera(activeCameraId);
+        } catch (err) {
+          console.error("Camera start failed:", err);
+        }
       }
     }
   };
 
-  const handleStopAnalysis = () => {
+  const handleStartAnalysis = async () => {
+    setIsStartingAnalysis(true);
+    try {
+      if (onStartAnalysis) {
+        await onStartAnalysis(activeCameraId);
+      } else {
+        await startCameraAnalysis(activeCameraId);
+      }
+      setAnalysisActive(true);
+      setStreamNonce(Date.now());
+    } catch (e) {
+      console.error("Start analysis error:", e);
+      setAnalysisActive(true);
+    } finally {
+      setIsStartingAnalysis(false);
+    }
+  };
+
+  const handleStopAll = () => {
+    setAnalysisActive(false);
     setLiveTelemetry(null);
     if (onStopCamera) {
       onStopCamera(activeCameraId);
     }
   };
 
-  const effectiveTelemetry = liveTelemetry || telemetry;
+  const handleStreamError = () => {
+    if (retryCount < 3) {
+      setTimeout(() => {
+        setRetryCount((prev) => prev + 1);
+        setStreamNonce(Date.now());
+      }, 800);
+    } else {
+      setStreamError(true);
+    }
+  };
 
-  const carCount = isOnline && effectiveTelemetry?.cars != null
-    ? effectiveTelemetry.cars
-    : (isOnline && effectiveTelemetry?.vehicles?.car != null
-      ? effectiveTelemetry.vehicles.car
-      : (isOnline && effectiveTelemetry?.vehicle_breakdown?.car != null
-        ? effectiveTelemetry.vehicle_breakdown.car
-        : (isOnline && effectiveTelemetry?.class_counts?.car != null
-          ? effectiveTelemetry.class_counts.car
-          : (isOnline ? 0 : "--"))));
+  const isConnecting = isLoadingAction || cameraStatus === "connecting" || cameraStatus === "starting";
+  const isError = (streamError && !isConnecting) || cameraStatus === "error";
+  const isDisconnected = cameraStatus === "disconnected";
+  const isStopped = cameraStatus === "stopped";
 
-  const truckCount = isOnline && effectiveTelemetry?.trucks != null
-    ? effectiveTelemetry.trucks
-    : (isOnline && effectiveTelemetry?.vehicles?.truck != null
-      ? effectiveTelemetry.vehicles.truck
-      : (isOnline && effectiveTelemetry?.vehicle_breakdown?.truck != null
-        ? effectiveTelemetry.vehicle_breakdown.truck
-        : (isOnline && effectiveTelemetry?.class_counts?.truck != null
-          ? effectiveTelemetry.class_counts.truck
-          : (isOnline ? 0 : "--"))));
+  // Status mapping: READY | LIVE | OFFLINE | CAMERA UNAVAILABLE
+  let statusText = "READY";
+  let statusColor = "var(--text-muted, #737987)";
+  if (isConnecting) {
+    statusText = "CONNECTING";
+    statusColor = "var(--status-high, #F59E0B)";
+  } else if (isOnline && !isError) {
+    statusText = "LIVE";
+    statusColor = "var(--status-normal, #22C55E)";
+  } else if (isError) {
+    statusText = "CAMERA UNAVAILABLE";
+    statusColor = "var(--status-critical, #F45E70)";
+  } else if (isDisconnected) {
+    statusText = "OFFLINE";
+    statusColor = "var(--status-critical, #F45E70)";
+  } else if (isStopped) {
+    statusText = "READY";
+    statusColor = "var(--text-muted, #737987)";
+  }
 
-  const busCount = isOnline && effectiveTelemetry?.buses != null
-    ? effectiveTelemetry.buses
-    : (isOnline && effectiveTelemetry?.vehicles?.bus != null
-      ? effectiveTelemetry.vehicles.bus
-      : (isOnline && effectiveTelemetry?.vehicle_breakdown?.bus != null
-        ? effectiveTelemetry.vehicle_breakdown.bus
-        : (isOnline && effectiveTelemetry?.class_counts?.bus != null
-          ? effectiveTelemetry.class_counts.bus
-          : (isOnline ? 0 : "--"))));
+  const hasTelemetryMetrics = (t) =>
+    Boolean(
+      t &&
+      (t.total_tracked != null ||
+       t.vehicle_count != null ||
+       t.total != null ||
+       t.cars != null ||
+       t.vehicles?.car != null ||
+       t.class_counts?.car != null ||
+       t.traffic_flow_vpm != null ||
+       t.flow_per_minute != null)
+    );
 
-  const bikeCount = isOnline && (effectiveTelemetry?.bikes != null || effectiveTelemetry?.vehicles?.bike != null || effectiveTelemetry?.vehicles?.motorcycle != null || effectiveTelemetry?.class_counts?.bike != null || effectiveTelemetry?.class_counts?.motorcycle != null)
-    ? (effectiveTelemetry.bikes ?? effectiveTelemetry.vehicles?.bike ?? effectiveTelemetry.vehicles?.motorcycle ?? effectiveTelemetry.class_counts?.bike ?? effectiveTelemetry.class_counts?.motorcycle ?? 0)
-    : (isOnline ? 0 : "--");
+  const isAnalysisRunning = Boolean(
+    analysisActive ||
+    (isOnline && (sourceMode === "video" || hasTelemetryMetrics(liveTelemetry) || hasTelemetryMetrics(telemetry)))
+  );
 
-  const totalCount = isOnline && (effectiveTelemetry?.total_tracked != null || effectiveTelemetry?.vehicle_count != null || effectiveTelemetry?.active_tracks != null || effectiveTelemetry?.total != null)
+  // Real measurements from live telemetry only when analysis is active
+  const effectiveTelemetry = isOnline && isAnalysisRunning ? (liveTelemetry || telemetry) : null;
+
+  const valVehicles = (effectiveTelemetry && (effectiveTelemetry.total_tracked != null || effectiveTelemetry.vehicle_count != null || effectiveTelemetry.active_tracks != null || effectiveTelemetry.total != null))
     ? (effectiveTelemetry.total_tracked ?? effectiveTelemetry.vehicle_count ?? effectiveTelemetry.active_tracks ?? effectiveTelemetry.total)
-    : (isOnline ? 0 : "--");
+    : null;
 
-  const flowRate = isOnline && (effectiveTelemetry?.flow_per_minute != null || effectiveTelemetry?.traffic_flow_vpm != null)
-    ? `${(effectiveTelemetry.flow_per_minute ?? effectiveTelemetry.traffic_flow_vpm).toFixed(1)} veh/min`
-    : "--";
+  const valCars = (effectiveTelemetry && (effectiveTelemetry.cars != null || effectiveTelemetry.vehicles?.car != null || effectiveTelemetry.vehicle_breakdown?.car != null || effectiveTelemetry.class_counts?.car != null))
+    ? (effectiveTelemetry.cars ?? effectiveTelemetry.vehicles?.car ?? effectiveTelemetry.vehicle_breakdown?.car ?? effectiveTelemetry.class_counts?.car)
+    : null;
+
+  const valTrucks = (effectiveTelemetry && (effectiveTelemetry.trucks != null || effectiveTelemetry.vehicles?.truck != null || effectiveTelemetry.vehicle_breakdown?.truck != null || effectiveTelemetry.class_counts?.truck != null))
+    ? (effectiveTelemetry.trucks ?? effectiveTelemetry.vehicles?.truck ?? effectiveTelemetry.vehicle_breakdown?.truck ?? effectiveTelemetry.class_counts?.truck)
+    : null;
+
+  const valBuses = (effectiveTelemetry && (effectiveTelemetry.buses != null || effectiveTelemetry.vehicles?.bus != null || effectiveTelemetry.vehicle_breakdown?.bus != null || effectiveTelemetry.class_counts?.bus != null))
+    ? (effectiveTelemetry.buses ?? effectiveTelemetry.vehicles?.bus ?? effectiveTelemetry.vehicle_breakdown?.bus ?? effectiveTelemetry.class_counts?.bus)
+    : null;
+
+  const valBikes = (effectiveTelemetry && (effectiveTelemetry.bikes != null || effectiveTelemetry.vehicles?.bike != null || effectiveTelemetry.vehicles?.motorcycle != null || effectiveTelemetry.vehicle_breakdown?.bike != null || effectiveTelemetry.class_counts?.bike != null || effectiveTelemetry.class_counts?.motorcycle != null))
+    ? (effectiveTelemetry.bikes ?? effectiveTelemetry.vehicles?.bike ?? effectiveTelemetry.vehicles?.motorcycle ?? effectiveTelemetry.vehicle_breakdown?.bike ?? effectiveTelemetry.class_counts?.bike ?? effectiveTelemetry.class_counts?.motorcycle)
+    : null;
+
+  const rawFlow = effectiveTelemetry?.flow_per_minute ?? effectiveTelemetry?.traffic_flow_vpm;
+  const valFlow = rawFlow != null ? `${rawFlow.toFixed(0)}/min` : null;
 
   const streamSrc = `${getStreamUrl(activeCameraId)}?t=${streamNonce}`;
-  const nearbyCameras = selectedJunction?.cameras || [];
+
+  // Default cameras list with approach labels
+  const defaultNearby = [
+    { id: "CCTV-SKG-01", name: "Sankagiri Junction Main Approach", status: "LIVE" },
+    { id: "CCTV-SKG-02", name: "South Outflow (Erode)", status: "LIVE" },
+    { id: "CCTV-SKG-03", name: "East Toll Plaza", status: "LIVE" },
+    { id: "CCTV-SKG-04", name: "West Bypass", status: "OFFLINE" },
+  ];
+
+  const availableCameras = (selectedJunction?.cameras && selectedJunction.cameras.length > 0)
+    ? selectedJunction.cameras.map((c) => ({
+        id: c.id,
+        name: c.approach || c.name || "Corridor Approach",
+        status: activeCameraId === c.id
+          ? (isOnline ? "LIVE" : "OFFLINE")
+          : (c.status === "ONLINE" || c.status === "LIVE" ? "LIVE" : "OFFLINE"),
+      }))
+    : defaultNearby;
+
+  const activeCamObj = availableCameras.find((c) => c.id === activeCameraId) || {
+    id: activeCameraId,
+    name: selectedJunction ? `${selectedJunction.name} Approach` : "Corridor Approach",
+    status: isOnline ? "LIVE" : "OFFLINE",
+  };
+
+  // Combined statewide and monitored junctions list
+  const allAvailableJunctions = useMemo(() => {
+    const list = [...(trafficService.allJunctions || []), ...(areaJunctions || [])];
+    const unique = new Map();
+    list.forEach((j) => {
+      if (!j || !j.name) return;
+      const key = (j.name || j.id || "").trim().toLowerCase();
+      if (!unique.has(key)) {
+        unique.set(key, j);
+      }
+    });
+    return Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [areaJunctions]);
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <div>
-          <h2 className="card-title">
-            <Video size={16} color="var(--state-blue)" />
-            {activeCameraId} • Video Feed
-          </h2>
-          <p className="card-subtitle">
-            {selectedJunction ? `${selectedJunction.name} Approach` : "Corridor Camera Feed"}
-          </p>
-        </div>
+    <div
+      style={{
+        background: "var(--bg-surface, #1B2028)",
+        border: "1px solid var(--border-default, #3D3F4E)",
+        borderRadius: "4px",
+        padding: "0.875rem 1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        fontFamily: "var(--font-sans)",
+      }}
+    >
+      {/* 1. COMPACT JUNCTION SELECTOR DROPDOWN */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        <select
+          value={selectedJunction?.id || ""}
+          onChange={(e) => {
+            const jId = e.target.value;
+            const jnc = allAvailableJunctions.find((j) => j.id === jId || (j.cameras || []).some((c) => c.id === jId));
+            if (jnc) {
+              if (onSelectJunction) onSelectJunction(jnc);
+              const firstCam = jnc.cameras?.[0]?.id;
+              if (firstCam && onSelectCamera) onSelectCamera(firstCam);
+            }
+          }}
+          aria-label="Select Junction"
+          style={{
+            width: "100%",
+            height: "32px",
+            padding: "0 0.65rem",
+            fontSize: "0.8125rem",
+            fontWeight: 700,
+            border: "1px solid var(--border-default, #3D3F4E)",
+            borderRadius: "4px",
+            background: "var(--bg-surface-elevated, #252936)",
+            color: "var(--text-primary, #F4F5F7)",
+            cursor: "pointer",
+          }}
+        >
+          <option value="" disabled>Select Junction...</option>
+          {allAvailableJunctions.map((j) => (
+            <option key={j.id} value={j.id}>
+              {j.name}
+            </option>
+          ))}
+        </select>
 
-        <div className="flex items-center gap-2">
-          <span className={`status-pill ${isOnline ? "online" : "offline"}`}>
-            <span className="status-dot"></span>
-            {isOnline ? (sourceMode === "video" ? "VIDEO ANALYSIS ACTIVE" : "LIVE CAMERA") : "ANALYSIS STOPPED"}
-          </span>
-        </div>
+        {/* 2. CAMERA APPROACH SELECTOR (Only if junction has multiple cameras) */}
+        {selectedJunction?.cameras && selectedJunction.cameras.length > 1 && (
+          <select
+            value={activeCameraId}
+            onChange={(e) => {
+              if (onSelectCamera) onSelectCamera(e.target.value);
+            }}
+            aria-label="Select Camera Approach"
+            style={{
+              width: "100%",
+              height: "28px",
+              padding: "0 0.5rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              border: "1px solid var(--border-default, #3D3F4E)",
+              borderRadius: "4px",
+              background: "var(--bg-surface-secondary, #252936)",
+              color: "var(--text-secondary, #A7ACB8)",
+              cursor: "pointer",
+            }}
+          >
+            {selectedJunction.cameras.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.approach || c.name || c.id}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {/* Nearby Cameras Bar if Junction is Selected */}
-      {nearbyCameras.length > 0 && (
-        <div
-          style={{
-            background: "#f1f5f9",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-xs)",
-            padding: "0.35rem 0.5rem",
-            marginBottom: "0.5rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>
-            Nearby Cameras:
-          </span>
-          <div style={{ display: "flex", gap: "0.25rem" }}>
-            {nearbyCameras.map((c) => {
-              const isSel = activeCameraId === c.id;
-              const isCamOnline = c.status === "ONLINE";
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    if (onSelectCamera) onSelectCamera(c.id);
-                  }}
-                  style={{
-                    border: isSel ? "1px solid #2563eb" : "1px solid #cbd5e1",
-                    background: isSel ? "#eff6ff" : "#ffffff",
-                    color: isSel ? "#1d4ed8" : "#334155",
-                    padding: "2px 5px",
-                    borderRadius: "2px",
-                    fontSize: "0.625rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "3px",
-                  }}
-                >
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: isCamOnline ? "#16a34a" : "#dc2626" }} />
-                  <span>{c.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 1. Camera Source Selector Tabs */}
-      <div style={{ display: "flex", gap: "0.25rem", background: "var(--bg-card-subtle)", padding: "0.25rem", borderRadius: "var(--radius-sm)", marginBottom: "0.75rem" }}>
+      {/* 3. MODE SWITCH: UPLOAD VIDEO | IP CAMERA */}
+      <div style={{ display: "flex", gap: "0.35rem" }}>
         <button
-          onClick={() => { setSourceMode("video"); if (onSelectCamera) onSelectCamera("CCTV-SKG-01"); }}
+          type="button"
+          onClick={() => {
+            setSourceMode("video");
+            if (onSelectCamera) onSelectCamera(selectedJunction?.cameras?.[0]?.id || activeCameraId || "CCTV-TPR-01");
+          }}
           style={{
             flex: 1,
-            padding: "0.35rem 0.5rem",
+            height: "28px",
+            padding: "0 0.5rem",
             fontSize: "0.6875rem",
-            fontWeight: 700,
-            border: "none",
-            borderRadius: "var(--radius-xs)",
+            fontWeight: 800,
+            letterSpacing: "0.03em",
+            border: sourceMode === "video" ? "1px solid var(--accent-soft-blue, #7B8BC8)" : "1px solid var(--border-default, #3D3F4E)",
+            borderRadius: "4px",
+            background: sourceMode === "video" ? "var(--accent-indigo, #3E4776)" : "transparent",
+            color: sourceMode === "video" ? "var(--text-primary, #F4F5F7)" : "var(--text-secondary, #A7ACB8)",
             cursor: "pointer",
-            background: sourceMode === "video" ? "#ffffff" : "transparent",
-            color: sourceMode === "video" ? "var(--text-primary)" : "var(--text-muted)",
-            boxShadow: sourceMode === "video" ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.25rem",
+            transition: "all 0.15s ease",
           }}
         >
-          <Video size={12} />
-          <span>Upload Video</span>
+          UPLOAD VIDEO
         </button>
 
         <button
-          onClick={() => { setSourceMode("ip"); if (onSelectCamera) onSelectCamera("CCTV-IP-01"); }}
+          type="button"
+          onClick={() => {
+            setSourceMode("ip");
+            if (onSelectCamera) onSelectCamera("CCTV-IP-01");
+          }}
           style={{
             flex: 1,
-            padding: "0.35rem 0.5rem",
+            height: "28px",
+            padding: "0 0.5rem",
             fontSize: "0.6875rem",
-            fontWeight: 700,
-            border: "none",
-            borderRadius: "var(--radius-xs)",
+            fontWeight: 800,
+            letterSpacing: "0.03em",
+            border: sourceMode === "ip" ? "1px solid var(--accent-soft-blue, #7B8BC8)" : "1px solid var(--border-default, #3D3F4E)",
+            borderRadius: "4px",
+            background: sourceMode === "ip" ? "var(--accent-indigo, #3E4776)" : "transparent",
+            color: sourceMode === "ip" ? "var(--text-primary, #F4F5F7)" : "var(--text-secondary, #A7ACB8)",
             cursor: "pointer",
-            background: sourceMode === "ip" ? "#ffffff" : "transparent",
-            color: sourceMode === "ip" ? "var(--text-primary)" : "var(--text-muted)",
-            boxShadow: sourceMode === "ip" ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.25rem",
+            transition: "all 0.15s ease",
           }}
         >
-          <Globe size={12} />
-          <span>IP Camera</span>
-        </button>
-
-        <button
-          onClick={() => { setSourceMode("mobile"); if (onSelectCamera) onSelectCamera("CCTV-MOBILE-01"); }}
-          style={{
-            flex: 1,
-            padding: "0.35rem 0.5rem",
-            fontSize: "0.6875rem",
-            fontWeight: 700,
-            border: "none",
-            borderRadius: "var(--radius-xs)",
-            cursor: "pointer",
-            background: sourceMode === "mobile" ? "#ffffff" : "transparent",
-            color: sourceMode === "mobile" ? "var(--text-primary)" : "var(--text-muted)",
-            boxShadow: sourceMode === "mobile" ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.25rem",
-          }}
-        >
-          <Smartphone size={12} />
-          <span>Mobile Cam</span>
-        </button>
-
-        <button
-          onClick={() => { setSourceMode("webcam"); }}
-          style={{
-            flex: 1,
-            padding: "0.35rem 0.5rem",
-            fontSize: "0.6875rem",
-            fontWeight: 700,
-            border: "none",
-            borderRadius: "var(--radius-xs)",
-            cursor: "pointer",
-            background: sourceMode === "webcam" ? "#ffffff" : "transparent",
-            color: sourceMode === "webcam" ? "var(--text-primary)" : "var(--text-muted)",
-            boxShadow: sourceMode === "webcam" ? "0 1px 2px rgba(0,0,0,0.05)" : "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "0.25rem",
-          }}
-        >
-          <Camera size={12} />
-          <span>PC Webcam</span>
+          IP CAMERA
         </button>
       </div>
 
-      {/* 2. Source-Specific Operational Controls */}
+      {/* Mode Controls: Video Dropdown + Upload MP4 OR RTSP URL */}
       {sourceMode === "video" && (
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: "0.35rem", alignItems: "center" }}>
           <select
             value={selectedVideo}
             onChange={(e) => handleVideoChange(e.target.value)}
             style={{
               flex: 1,
-              padding: "0.35rem 0.5rem",
+              height: "30px",
+              padding: "0 0.5rem",
               fontSize: "0.75rem",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-xs)",
-              background: "#ffffff",
-              color: "var(--text-primary)",
+              border: "1px solid var(--border-default, #3D3F4E)",
+              borderRadius: "4px",
+              background: "var(--bg-surface-elevated, #252936)",
+              color: "var(--text-primary, #F4F5F7)",
             }}
           >
             <option value="Traffic.mp4">Traffic.mp4 (Sankagiri Inflow)</option>
             <option value="Traffic2.mp4">Traffic2.mp4 (Salem Corridor)</option>
             <option value="Traffic3.mp4">Traffic3.mp4 (Erode Radial)</option>
-            {videoList.filter(v => !["Traffic.mp4", "Traffic2.mp4", "Traffic3.mp4"].includes(v.filename)).map((v) => (
-              <option key={v.filename} value={v.filename}>{v.filename} ({v.size_mb} MB)</option>
-            ))}
+            {videoList
+              .filter((v) => {
+                const fname = typeof v === "string" ? v : v?.filename;
+                return !["Traffic.mp4", "Traffic2.mp4", "Traffic3.mp4"].includes(fname);
+              })
+              .map((v) => {
+                const fname = typeof v === "string" ? v : (v?.filename || "video.mp4");
+                const size = typeof v === "object" && v?.size_mb ? ` (${v.size_mb} MB)` : "";
+                return (
+                  <option key={fname} value={fname}>
+                    {fname}{size}
+                  </option>
+                );
+              })}
           </select>
 
           <label
             style={{
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
-              gap: "0.25rem",
-              padding: "0.35rem 0.6rem",
-              background: "#f1f5f9",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-xs)",
+              gap: "0.3rem",
+              height: "30px",
+              padding: "0 0.65rem",
+              background: "var(--bg-surface-elevated, #252936)",
+              border: "1px solid var(--border-default, #3D3F4E)",
+              borderRadius: "4px",
               fontSize: "0.6875rem",
               fontWeight: 700,
               cursor: "pointer",
-              color: "var(--text-secondary)",
+              color: "var(--text-secondary, #A7ACB8)",
+              whiteSpace: "nowrap",
             }}
           >
             <Upload size={12} />
@@ -468,210 +532,289 @@ export default function CCTVPanel({
       )}
 
       {sourceMode === "ip" && (
-        <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", alignItems: "center" }}>
+        <div>
           <input
             type="text"
-            placeholder="rtsp://user:pass@ip:554/stream"
+            placeholder="rtsp://10.203.2.136:1945/"
             value={rtspUrl}
-            onChange={(e) => setRtspUrl(e.target.value)}
+            onChange={(e) => {
+              setRtspUrl(e.target.value);
+              if (urlError) setUrlError("");
+            }}
             style={{
-              flex: 1,
-              padding: "0.35rem 0.5rem",
+              width: "100%",
+              height: "30px",
+              padding: "0 0.5rem",
               fontSize: "0.75rem",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-xs)",
-              background: "#ffffff",
+              border: urlError ? "1px solid var(--status-critical, #F45E70)" : "1px solid var(--border-default, #3D3F4E)",
+              borderRadius: "4px",
+              background: "var(--bg-surface-elevated, #252936)",
               fontFamily: "var(--font-mono)",
+              color: "var(--text-primary, #F4F5F7)",
+              boxSizing: "border-box",
             }}
           />
-        </div>
-      )}
-
-      {sourceMode === "mobile" && (
-        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "var(--radius-xs)", padding: "0.5rem 0.75rem", marginBottom: "0.75rem", fontSize: "0.6875rem", color: "#1e40af", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span>📱 Open on Mobile: <strong>http://{lanIp}:5173</strong></span>
-          <span style={{ fontSize: "0.625rem", background: "#dbeafe", padding: "2px 6px", borderRadius: "2px", fontWeight: 700 }}>LAN Ready</span>
-        </div>
-      )}
-
-      {/* 3. Video Stream Container with YOLO + ByteTrack Overlays */}
-      <div className="cctv-view-box mb-3" style={{ minHeight: "210px" }}>
-        {sourceMode === "webcam" && webcamActive ? (
-          <div style={{ width: "100%", height: "100%", position: "relative" }}>
-            <video ref={videoRef} autoPlay playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            <canvas ref={canvasRef} style={{ display: "none" }} />
-            <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(15, 23, 42, 0.85)", color: "#ffffff", padding: "2px 6px", borderRadius: "2px", fontSize: "10px", fontWeight: 700 }}>
-              WEBCAM FEEDING YOLO11 AI
+          {urlError && (
+            <div style={{ fontSize: "0.6875rem", color: "var(--status-critical, #F45E70)", marginTop: "2px", fontWeight: 600 }}>
+              {urlError}
             </div>
-          </div>
-        ) : isOnline && !streamError ? (
-          <img
-            key={`${activeCameraId}-${streamNonce}`}
-            src={streamSrc}
-            alt="Live Camera Feed"
-            style={{ width: "100%", height: "100%", objectFit: "contain", background: "#020617", display: "block" }}
-            onError={() => {
-              setTimeout(() => {
-                setStreamNonce(Date.now());
-              }, 1000);
-            }}
-          />
-        ) : localVideoUrl ? (
-          <video
-            src={localVideoUrl}
-            controls
-            autoPlay
-            loop
-            muted
-            style={{ width: "100%", height: "100%", objectFit: "contain", background: "#020617" }}
-          />
+          )}
+        </div>
+      )}
+
+      {/* 4. VIDEO CANVAS (Dominating visual element) */}
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          minHeight: "240px",
+          maxHeight: "320px",
+          background: "#0d0f11",
+          borderRadius: "4px",
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          border: "1px solid var(--border-default, #3D3F4E)",
+        }}
+      >
+        {isOnline && !streamError ? (
+          <>
+            <img
+              key={`${activeCameraId}-${streamNonce}`}
+              src={streamSrc}
+              alt="Live Camera Feed"
+              style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+              onError={handleStreamError}
+            />
+            <div
+              style={{
+                position: "absolute",
+                top: "8px",
+                left: "8px",
+                background: "rgba(17, 19, 21, 0.85)",
+                color: "var(--status-normal, #22C55E)",
+                fontSize: "10px",
+                fontWeight: 800,
+                padding: "2px 6px",
+                borderRadius: "3px",
+                letterSpacing: "0.05em",
+                border: "1px solid rgba(255,255,255,0.15)",
+              }}
+            >
+              LIVE
+            </div>
+          </>
         ) : (
-          <div className="cctv-standby-overlay">
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.5rem" }}>
-              <div
-                style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "var(--radius-xs)",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#94a3b8",
-                }}
-              >
-                <Video size={18} />
-              </div>
-            </div>
-            <div style={{ fontWeight: 700, fontSize: "0.8125rem", color: "#f1f5f9" }}>
-              {sourceMode === "video" ? `Standby: ${selectedVideo}` : "No Live Feed"}
-            </div>
-            <p style={{ fontSize: "0.6875rem", color: "#64748b", marginTop: "0.25rem" }}>
-              {sourceMode === "video" ? 'Click "Start Video Analysis" to run YOLO11 + ByteTrack' :
-               sourceMode === "ip" ? "Ingesting RTSP Stream via OpenCV" :
-               sourceMode === "mobile" ? "Awaiting Frame Stream from Mobile Device" :
-               "Select configured camera or upload video"}
-            </p>
+          <div style={{ textAlign: "center", padding: "1.5rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+            {isConnecting || !isError ? (
+              <>
+                <Loader2 size={24} className="animate-spin" color="var(--accent-soft-blue, #7B8BC8)" />
+                <div style={{ color: "var(--text-muted, #737987)", fontSize: "0.75rem", fontWeight: 600, letterSpacing: "0.04em" }}>
+                  CONNECTING TO LIVE FEED...
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ color: "var(--status-critical, #F45E70)", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.04em" }}>
+                  CAMERA UNAVAILABLE
+                </div>
+                <button
+                  type="button"
+                  onClick={handleStartCamera}
+                  style={{
+                    padding: "0.25rem 0.65rem",
+                    fontSize: "0.6875rem",
+                    fontWeight: 700,
+                    background: "var(--bg-surface-elevated, #252936)",
+                    color: "var(--text-primary, #F4F5F7)",
+                    border: "1px solid var(--border-default, #3D3F4E)",
+                    borderRadius: "3px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Retry
+                </button>
+              </>
+            )}
           </div>
         )}
+      </div>
 
-        {/* Live Active Badge */}
-        {isOnline && (
-          <div
+      {/* 5. STOP / STATUS CONTROLS (Only when active) */}
+      {isOnline && (
+        <div>
+          {!isAnalysisRunning ? (
+            <button
+            type="button"
+            onClick={handleStartAnalysis}
+            disabled={isLoadingAction || isStartingAnalysis}
             style={{
-              position: "absolute",
-              top: 8,
-              left: 8,
-              background: "rgba(15, 23, 42, 0.85)",
-              border: "1px solid rgba(255,255,255,0.2)",
-              padding: "0.2rem 0.5rem",
-              borderRadius: "var(--radius-xs)",
+              width: "100%",
+              height: "32px",
+              padding: "0 1rem",
+              background: "var(--status-normal, #22C55E)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "0.75rem",
+              fontWeight: 800,
+              letterSpacing: "0.04em",
+              cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: "0.375rem",
-              color: "#ffffff",
-              fontSize: "0.625rem",
-              fontWeight: 700,
-              fontFamily: "var(--font-mono)",
+              justifyContent: "center",
+              gap: "0.5rem",
+              transition: "all 0.15s ease",
             }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }}></span>
-            YOLO11 + BYTETRACK STREAM ACTIVE
-          </div>
-        )}
-      </div>
-
-      {/* 4. Action Buttons */}
-      <div className="flex items-center gap-2 mb-3">
-        {sourceMode === "webcam" ? (
-          !webcamActive ? (
-            <button className="btn btn-primary w-full" onClick={startBrowserWebcam}>
-              <Camera size={14} />
-              <span>Start PC Webcam Stream</span>
-            </button>
-          ) : (
-            <button className="btn btn-danger w-full" onClick={stopBrowserWebcam}>
-              <Square size={14} />
-              <span>Stop PC Webcam Stream</span>
-            </button>
-          )
-        ) : !isOnline ? (
-          <button
-            className="btn btn-success w-full"
-            onClick={handleStartAnalysis}
-            disabled={isLoadingAction}
-          >
-            {isLoadingAction ? (
+            {isStartingAnalysis ? (
               <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Launching Analysis Pipeline...</span>
+                <Loader2 size={13} className="animate-spin" />
+                <span>STARTING ANALYSIS...</span>
               </>
             ) : (
-              <>
-                <Play size={14} />
-                <span>Start Video Analysis</span>
-              </>
+              <span>START ANALYSIS</span>
             )}
           </button>
         ) : (
           <button
-            className="btn btn-danger w-full"
-            onClick={handleStopAnalysis}
+            type="button"
+            onClick={handleStopAll}
             disabled={isLoadingAction}
+            style={{
+              width: "100%",
+              height: "32px",
+              padding: "0 1rem",
+              background: "var(--status-critical, #F45E70)",
+              color: "#FFFFFF",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "0.75rem",
+              fontWeight: 800,
+              letterSpacing: "0.04em",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.5rem",
+              transition: "all 0.15s ease",
+            }}
           >
-            {isLoadingAction ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Stopping Pipeline...</span>
-              </>
-            ) : (
-              <>
-                <Square size={14} />
-                <span>Stop Analysis</span>
-              </>
-            )}
+            <span>STOP</span>
           </button>
         )}
       </div>
+    )}
 
-      {/* 5. Live Detected Vehicles Breakdown */}
-      <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "0.625rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
-          <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>
-            Tracked Vehicles ({totalCount})
-          </span>
-          <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-secondary)" }}>
-            Flow: <strong>{flowRate}</strong>
-          </span>
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.375rem" }}>
-          <div style={{ background: "var(--bg-card-subtle)", padding: "0.4rem 0.5rem", borderRadius: "var(--radius-xs)", textAlign: "center" }}>
-            <span style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>CARS</span>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              {carCount}
+      {/* 6. TELEMETRY MEASUREMENTS (Clean 3x2 Grid with hairline divider, bold high-contrast text) */}
+      <div style={{ borderTop: "1px solid var(--border-light, #2C303C)", paddingTop: "0.75rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem 0.5rem" }}>
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Vehicles
+            </div>
+            <div
+              style={{
+                fontSize: "1.375rem",
+                fontWeight: 900,
+                color: valVehicles != null ? "var(--text-primary, #F4F5F7)" : "var(--text-muted, #737987)",
+                fontFamily: "var(--font-sans)",
+                marginTop: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {valVehicles != null ? valVehicles : "—"}
             </div>
           </div>
 
-          <div style={{ background: "var(--bg-card-subtle)", padding: "0.4rem 0.5rem", borderRadius: "var(--radius-xs)", textAlign: "center" }}>
-            <span style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>TRUCKS</span>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              {truckCount}
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Cars
+            </div>
+            <div
+              style={{
+                fontSize: "1.375rem",
+                fontWeight: 900,
+                color: valCars != null ? "var(--text-primary, #F4F5F7)" : "var(--text-muted, #737987)",
+                fontFamily: "var(--font-sans)",
+                marginTop: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {valCars != null ? valCars : "—"}
             </div>
           </div>
 
-          <div style={{ background: "var(--bg-card-subtle)", padding: "0.4rem 0.5rem", borderRadius: "var(--radius-xs)", textAlign: "center" }}>
-            <span style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>BUSES</span>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              {busCount}
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Trucks
+            </div>
+            <div
+              style={{
+                fontSize: "1.375rem",
+                fontWeight: 900,
+                color: valTrucks != null ? "var(--text-primary, #F4F5F7)" : "var(--text-muted, #737987)",
+                fontFamily: "var(--font-sans)",
+                marginTop: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {valTrucks != null ? valTrucks : "—"}
             </div>
           </div>
 
-          <div style={{ background: "var(--bg-card-subtle)", padding: "0.4rem 0.5rem", borderRadius: "var(--radius-xs)", textAlign: "center" }}>
-            <span style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>BIKES</span>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "var(--font-mono)" }}>
-              {bikeCount}
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Buses
+            </div>
+            <div
+              style={{
+                fontSize: "1.375rem",
+                fontWeight: 900,
+                color: valBuses != null ? "var(--text-primary, #F4F5F7)" : "var(--text-muted, #737987)",
+                fontFamily: "var(--font-sans)",
+                marginTop: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {valBuses != null ? valBuses : "—"}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Bikes
+            </div>
+            <div
+              style={{
+                fontSize: "1.375rem",
+                fontWeight: 900,
+                color: valBikes != null ? "var(--text-primary, #F4F5F7)" : "var(--text-muted, #737987)",
+                fontFamily: "var(--font-sans)",
+                marginTop: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {valBikes != null ? valBikes : "—"}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              Flow
+            </div>
+            <div
+              style={{
+                fontSize: "1.375rem",
+                fontWeight: 900,
+                color: valFlow != null ? "var(--text-primary, #F4F5F7)" : "var(--text-muted, #737987)",
+                fontFamily: "var(--font-sans)",
+                marginTop: "2px",
+                lineHeight: 1.2,
+              }}
+            >
+              {valFlow != null ? valFlow : "—"}
             </div>
           </div>
         </div>

@@ -1,45 +1,58 @@
 import React from "react";
-import { DATA_PROVENANCE } from "../services/tamilNaduTrafficData";
+import { useSettings } from "../context/SettingsContext";
 
 export default function SummaryCards({
   telemetry = null,
   cameraStatus = "offline",
   selectedJunction = null,
   areaJunctions = [],
+  activeCameraId = null,
+  districtName = "Tamil Nadu",
+  selectedLocation = null,
 }) {
+  const { t } = useSettings();
   const isCameraOnline = cameraStatus === "online";
   const hasLiveTelemetry = isCameraOnline && telemetry && (telemetry.vehicle_count !== undefined || telemetry.total_tracked !== undefined);
+
+  let locationScope = "CURRENT LOCATION";
+  if (hasLiveTelemetry) {
+    locationScope = activeCameraId ? activeCameraId : "LIVE TELEMETRY";
+  } else if (districtName && districtName.toLowerCase() !== "tamil nadu") {
+    locationScope = `${districtName.toUpperCase()} AREA STATUS`;
+  } else if (selectedLocation?.name && selectedLocation.name.toLowerCase() !== "tamil nadu") {
+    locationScope = `${selectedLocation.name.toUpperCase()} AREA STATUS`;
+  } else {
+    locationScope = "AREA TRAFFIC STATUS";
+  }
 
   let vehicleCount = null;
   let avgSpeed = null;
   let density = null;
   let occupancy = null;
   let flow = null;
-  let provenance = DATA_PROVENANCE.UNAVAILABLE;
 
   if (hasLiveTelemetry) {
-    // 1. Live camera telemetry has top priority if currently streaming
-    vehicleCount = telemetry.vehicle_count ?? telemetry.total_tracked ?? 0;
-    avgSpeed = telemetry.average_speed_kmh != null ? `${telemetry.average_speed_kmh.toFixed(1)} km/h` : "--";
-    density = telemetry.vehicle_density != null ? `${telemetry.vehicle_density.toFixed(1)} veh/km` : "--";
-    occupancy = telemetry.road_occupancy != null ? `${(telemetry.road_occupancy * 100).toFixed(0)}%` : "--";
+    // 1. Live camera telemetry from active video/RTSP analysis
+    vehicleCount = telemetry.vehicle_count ?? telemetry.total_tracked;
+    avgSpeed = telemetry.average_speed_kmh != null ? `${telemetry.average_speed_kmh.toFixed(1)} km/h` : null;
+    density = telemetry.vehicle_density != null ? `${telemetry.vehicle_density.toFixed(1)} veh/km` : null;
+    occupancy = telemetry.road_occupancy != null ? `${(telemetry.road_occupancy * 100).toFixed(0)}%` : null;
     flow = (telemetry.traffic_flow_vpm != null || telemetry.flow_per_minute != null)
       ? `${(telemetry.traffic_flow_vpm ?? telemetry.flow_per_minute).toFixed(1)} veh/min`
-      : "--";
-    provenance = DATA_PROVENANCE.LIVE;
+      : null;
   } else if (selectedJunction && selectedJunction.metrics) {
-    // 2. Selected junction metrics
+    // 2. Exact Selected Junction Metrics (Synchronized when a junction is clicked)
     const m = selectedJunction.metrics;
     vehicleCount = m.vehicleCount != null ? m.vehicleCount : null;
     avgSpeed = m.averageSpeedKmh != null ? `${m.averageSpeedKmh} km/h` : null;
-    density = m.density || (m.densityVehKm ? `${m.densityVehKm} veh/km` : null);
+    density = m.densityVehKm != null ? `${m.densityVehKm} veh/km` : (m.density || null);
     occupancy = m.roadOccupancyPct != null ? `${m.roadOccupancyPct}%` : null;
     flow = m.trafficFlowVpm != null ? `${m.trafficFlowVpm} veh/min` : null;
-    provenance = selectedJunction.provenance || DATA_PROVENANCE.SIMULATED;
   } else if (areaJunctions && areaJunctions.length > 0) {
-    // 3. Aggregated district values across junctions
+    // 3. Area aggregate telemetry when viewing overall area overview
     let totalVehicles = 0;
     let speedSum = 0;
+    let densitySum = 0;
     let occupancySum = 0;
     let flowSum = 0;
     let count = 0;
@@ -48,6 +61,7 @@ export default function SummaryCards({
       if (j.metrics) {
         totalVehicles += j.metrics.vehicleCount || 0;
         speedSum += j.metrics.averageSpeedKmh || 0;
+        densitySum += j.metrics.densityVehKm || 0;
         occupancySum += j.metrics.roadOccupancyPct || 0;
         flowSum += j.metrics.trafficFlowVpm || 0;
         count++;
@@ -57,80 +71,141 @@ export default function SummaryCards({
     if (count > 0) {
       vehicleCount = totalVehicles;
       avgSpeed = `${(speedSum / count).toFixed(1)} km/h`;
-      density = `${(totalVehicles / (count * 2.5)).toFixed(1)} veh/km`;
+      density = `${(densitySum / count).toFixed(1)} veh/km`;
       occupancy = `${Math.round(occupancySum / count)}%`;
       flow = `${(flowSum / count).toFixed(1)} veh/min`;
-      provenance = DATA_PROVENANCE.SIMULATED;
     }
   }
 
-  const badgeColor =
-    provenance === DATA_PROVENANCE.LIVE
-      ? { bg: "#dcfce7", text: "#15803d", border: "#86efac" }
-      : provenance === DATA_PROVENANCE.SIMULATED
-      ? { bg: "#fef3c7", text: "#b45309", border: "#fde68a" }
-      : { bg: "#f1f5f9", text: "#64748b", border: "#e2e8f0" };
+  // Subtle operational color highlighting
+  const isOccupancyHigh = occupancy != null && parseInt(occupancy) >= 70;
+  const isSpeedLow = avgSpeed != null && parseFloat(avgSpeed) < 20;
 
   return (
     <div
       style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-default)",
-        borderRadius: "var(--radius-xs)",
-        padding: "0.625rem 1.25rem",
-        display: "grid",
-        gridTemplateColumns: "repeat(5, 1fr)",
-        gap: "1.25rem",
+        background: "var(--bg-surface, #1B2028)",
+        border: "1px solid var(--border-default, #3D3F4E)",
+        borderRadius: "4px",
+        padding: "0.55rem 0.85rem",
+        display: "flex",
         alignItems: "center",
+        fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
     >
-      {/* 1. Vehicles */}
-      <div style={{ borderRight: "1px solid var(--border-light)", paddingRight: "1rem" }}>
-        <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-          Vehicles Detected
+      {/* Flat Operational Measurements Strip: 5 Bold Metrics Evenly Distributed */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          width: "100%",
+          alignItems: "center",
+        }}
+      >
+        {/* 1. Vehicles */}
+        <div style={{ padding: "0 0.85rem", borderRight: "1px solid var(--border-light, #2C303C)" }}>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+            {t("traffic.vehicles", "Vehicles")}
+          </div>
+          <div style={{ marginTop: "2px" }}>
+            {vehicleCount != null ? (
+              <span style={{ fontSize: "1.375rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-sans)", lineHeight: 1.1 }}>
+                {vehicleCount}
+              </span>
+            ) : (
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.8125rem", fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                {t("common.dataUnavailable", "Data unavailable")}
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1, marginTop: "0.25rem" }}>
-          {vehicleCount != null ? vehicleCount : <span style={{ color: "#94a3b8" }}>--</span>}
-        </div>
-      </div>
 
-      {/* 2. Average Speed */}
-      <div style={{ borderRight: "1px solid var(--border-light)", paddingRight: "1rem" }}>
-        <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-          Average Speed
+        {/* 2. Average Speed */}
+        <div style={{ padding: "0 0.85rem", borderRight: "1px solid var(--border-light, #2C303C)" }}>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+            {t("traffic.averageSpeed", "Average Speed")}
+          </div>
+          <div style={{ marginTop: "2px" }}>
+            {avgSpeed != null ? (
+              <span
+                style={{
+                  fontSize: "1.375rem",
+                  fontWeight: 800,
+                  color: isSpeedLow ? "var(--status-critical, #F45E70)" : "var(--text-primary, #F4F5F7)",
+                  fontFamily: "var(--font-sans)",
+                  lineHeight: 1.1,
+                }}
+              >
+                {avgSpeed}
+              </span>
+            ) : (
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.8125rem", fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                {t("common.dataUnavailable", "Data unavailable")}
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1, marginTop: "0.25rem" }}>
-          {avgSpeed != null ? avgSpeed : <span style={{ color: "#94a3b8" }}>--</span>}
-        </div>
-      </div>
 
-      {/* 3. Traffic Density */}
-      <div style={{ borderRight: "1px solid var(--border-light)", paddingRight: "1rem" }}>
-        <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-          Traffic Density
+        {/* 3. Traffic Density */}
+        <div style={{ padding: "0 0.85rem", borderRight: "1px solid var(--border-light, #2C303C)" }}>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+            {t("traffic.density", "Traffic Density")}
+          </div>
+          <div style={{ marginTop: "2px" }}>
+            {density != null ? (
+              <span style={{ fontSize: "1.375rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-sans)", lineHeight: 1.1 }}>
+                {density}
+              </span>
+            ) : (
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.8125rem", fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                {t("common.dataUnavailable", "Data unavailable")}
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1, marginTop: "0.25rem" }}>
-          {density != null ? density : <span style={{ color: "#94a3b8" }}>--</span>}
-        </div>
-      </div>
 
-      {/* 4. Road Occupancy */}
-      <div style={{ borderRight: "1px solid var(--border-light)", paddingRight: "1rem" }}>
-        <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-          Road Occupancy
+        {/* 4. Road Occupancy */}
+        <div style={{ padding: "0 0.85rem", borderRight: "1px solid var(--border-light, #2C303C)" }}>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+            {t("traffic.occupancy", "Road Occupancy")}
+          </div>
+          <div style={{ marginTop: "2px" }}>
+            {occupancy != null ? (
+              <span
+                style={{
+                  fontSize: "1.375rem",
+                  fontWeight: 800,
+                  color: isOccupancyHigh ? "var(--status-critical, #F45E70)" : "var(--text-primary, #F4F5F7)",
+                  fontFamily: "var(--font-sans)",
+                  lineHeight: 1.1,
+                }}
+              >
+                {occupancy}
+              </span>
+            ) : (
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.8125rem", fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                {t("common.dataUnavailable", "Data unavailable")}
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1, marginTop: "0.25rem" }}>
-          {occupancy != null ? occupancy : <span style={{ color: "#94a3b8" }}>--</span>}
-        </div>
-      </div>
 
-      {/* 5. Traffic Flow */}
-      <div>
-        <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-          Traffic Flow
-        </div>
-        <div style={{ fontSize: "1.625rem", fontWeight: 800, color: "var(--text-primary)", lineHeight: 1.1, marginTop: "0.25rem" }}>
-          {flow != null ? flow : <span style={{ color: "#94a3b8" }}>--</span>}
+        {/* 5. Traffic Flow */}
+        <div style={{ padding: "0 0.85rem" }}>
+          <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap" }}>
+            {t("traffic.flow", "Traffic Flow")}
+          </div>
+          <div style={{ marginTop: "2px" }}>
+            {flow != null ? (
+              <span style={{ fontSize: "1.375rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-sans)", lineHeight: 1.1 }}>
+                {flow}
+              </span>
+            ) : (
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.8125rem", fontWeight: 600, fontFamily: "var(--font-sans)" }}>
+                {t("common.dataUnavailable", "Data unavailable")}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

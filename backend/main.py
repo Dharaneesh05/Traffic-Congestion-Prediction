@@ -433,6 +433,51 @@ async def get_network_info():
     }
 
 
+# ── Current Location Geolocation Endpoint ──
+@app.get("/api/current-location")
+async def get_current_location():
+    """
+    Detect the operational center's current location via IP/network geocoding,
+    falling back to known Tamil Nadu operational center if network lookup fails.
+    """
+    import urllib.request
+    import json
+
+    try:
+        req = urllib.request.Request(
+            "http://ip-api.com/json",
+            headers={"User-Agent": "TamilNaduTrafficControl/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("status") == "success" and data.get("lat") and data.get("lon"):
+                city = data.get("city") or "Tirupur"
+                region = data.get("regionName") or "Tamil Nadu"
+                return {
+                    "status": "success",
+                    "lat": float(data["lat"]),
+                    "lon": float(data["lon"]),
+                    "city": city,
+                    "district": city,
+                    "region": region,
+                    "name": f"{city}, {region}",
+                    "source": "ip-network"
+                }
+    except Exception as e:
+        print(f"[Location] IP lookup note: {e}")
+
+    return {
+        "status": "success",
+        "lat": 11.1067,
+        "lon": 77.3545,
+        "city": "Tirupur",
+        "district": "Tirupur",
+        "region": "Tamil Nadu",
+        "name": "Tirupur, Tamil Nadu",
+        "source": "control-station"
+    }
+
+
 # ── Available Sample Videos ──
 @app.get("/api/videos")
 async def list_available_videos():
@@ -1067,6 +1112,72 @@ async def create_camera(payload: CameraCreatePayload):
     return {"message": "Camera created successfully.", "camera": model.to_dict()}
 
 
+# ── 2b. GET /api/cameras/aggregate ──
+@app.get("/api/cameras/aggregate")
+async def get_cameras_aggregate():
+    """
+    Aggregate real-time metrics across all active cameras.
+    Used by the Dashboard KPI cards and TrafficAnalytics page.
+
+    Returns:
+        total_vehicles      : Sum of vehicle_count across all active cameras
+        avg_speed_kmh       : Mean average_speed_kmh across active cameras
+        avg_congestion_score: Mean congestion_score across active cameras
+        active_camera_count : Number of cameras currently processing
+        class_counts        : Aggregated per-class vehicle counts (car/truck/bus/motorcycle)
+        per_camera          : Per-camera breakdown list
+    """
+    per_camera = []
+    total_vehicles = 0
+    speed_sum = 0.0
+    score_sum = 0.0
+    active_count = 0
+    class_totals: dict = {"car": 0, "truck": 0, "bus": 0, "motorcycle": 0}
+
+    for cam in CAMERAS:
+        cid = cam["camera_id"]
+        state = _get_camera_state(cid)
+        m = state.get("metrics", {})
+
+        is_active = state.get("status") == "ONLINE"
+        count = m.get("vehicle_count", 0)
+        speed = m.get("average_speed_kmh", 0.0)
+        score = m.get("congestion_score", 0.0)
+        level = m.get("congestion_level", "FREE_FLOW")
+        cc    = m.get("class_counts", {})
+
+        if is_active and m:
+            active_count += 1
+            total_vehicles += count
+            speed_sum += speed
+            score_sum += score
+            for cls in class_totals:
+                class_totals[cls] += cc.get(cls, 0)
+
+        per_camera.append({
+            "id":                cam["camera_id"],
+            "name":              cam["camera_name"],
+            "status":            state.get("status", "OFFLINE"),
+            "vehicle_count":     count,
+            "average_speed_kmh": round(speed, 1),
+            "congestion_score":  round(score, 3),
+            "congestion_level":  level,
+            "class_counts":      cc,
+        })
+
+    avg_speed = round(speed_sum / active_count, 1) if active_count > 0 else 0.0
+    avg_score = round(score_sum / active_count, 3) if active_count > 0 else 0.0
+
+    return {
+        "active_camera_count":  active_count,
+        "total_vehicles":       total_vehicles,
+        "avg_speed_kmh":        avg_speed,
+        "avg_congestion_score": avg_score,
+        "class_counts":         class_totals,
+        "per_camera":           per_camera,
+    }
+
+
 # ── 3. GET /api/cameras/{camera_id} ──
 @app.get("/api/cameras/{camera_id}")
 async def get_camera_by_id(camera_id: str):
@@ -1112,14 +1223,26 @@ async def start_camera_endpoint(camera_id: str, request: Request = None):
     try:
         video = None
         source = None
+        source_type = None
+        auto_analysis = None
         if request:
             try:
                 body = await request.json()
                 if isinstance(body, dict):
                     video = body.get("video")
                     source = body.get("source")
+                    source_type = body.get("source_type")
+                    if "auto_analysis" in body:
+                        auto_analysis = bool(body.get("auto_analysis"))
             except Exception:
                 pass
+
+        if source:
+            src_str = str(source).strip()
+            if source_type == "rtsp" or src_str.lower().startswith(("rtsp://", "rtsps://")):
+                source_type = "rtsp"
+                if not (src_str.lower().startswith("rtsp://") or src_str.lower().startswith("rtsps://")):
+                    raise HTTPException(status_code=400, detail="Invalid RTSP URL. Must begin with rtsp://")
 
         model = camera_registry.start_camera(
             camera_id,
@@ -1127,13 +1250,61 @@ async def start_camera_endpoint(camera_id: str, request: Request = None):
             predictor=app_state.predictor,
             route_planner=app_state.route_planner,
             source=source,
+            source_type=source_type,
             video=video,
+            auto_analysis=auto_analysis,
         )
+
+        # For network RTSP cameras, wait up to 8.0s for initial connection verification
+        if model.source_type.lower() in ["ip", "rtsp"]:
+            worker = camera_registry.get_worker(model.camera_id)
+            t0 = time.time()
+            while time.time() - t0 < 8.0:
+                if model.status in ["online", "error"]:
+                    break
+                await asyncio.sleep(0.2)
+
+            if model.status == "error":
+                raise HTTPException(
+                    status_code=400,
+                    detail=model.error_message or "Unable to connect to video feed"
+                )
+
         return {"message": f"Camera '{model.camera_id}' ({model.name}) started successfully.", "camera": model.to_dict()}
+    except HTTPException:
+        raise
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start camera '{camera_id}': {e}")
+
+
+# ── 6b. POST /api/cameras/{camera_id}/start-analysis ──
+@app.post("/api/cameras/{camera_id}/start-analysis")
+@app.post("/api/camera/{camera_id}/start-analysis")
+async def start_camera_analysis_endpoint(camera_id: str):
+    """Start YOLO11 + ByteTrack detection and tracking on an active camera stream."""
+    try:
+        model = camera_registry.start_analysis(camera_id)
+        return {"message": f"Analysis started for camera '{model.camera_id}'.", "camera": model.to_dict()}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found or not running.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start analysis for '{camera_id}': {e}")
+
+
+# ── 6c. POST /api/cameras/{camera_id}/stop-analysis ──
+@app.post("/api/cameras/{camera_id}/stop-analysis")
+@app.post("/api/camera/{camera_id}/stop-analysis")
+async def stop_camera_analysis_endpoint(camera_id: str):
+    """Stop detection analysis while preserving camera connection and stream."""
+    try:
+        model = camera_registry.stop_analysis(camera_id)
+        return {"message": f"Analysis stopped for camera '{model.camera_id}'.", "camera": model.to_dict()}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found or not running.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to stop analysis for '{camera_id}': {e}")
 
 
 # ── 7. POST /api/cameras/{camera_id}/stop ──
@@ -1188,21 +1359,32 @@ async def stream_camera(camera_id: str):
         raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
 
     worker = camera_registry.get_worker(model.camera_id)
-    if not worker:
-        try:
-            model = camera_registry.start_camera(model.camera_id)
-            worker = camera_registry.get_worker(model.camera_id)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to start stream: {e}")
+    if not worker or model.status not in ["starting", "online"]:
+        raise HTTPException(status_code=503, detail="Camera feed not running or unavailable.")
+
+    # Wait up to 3.0s for the first frame to become available if starting
+    t_wait = 0.0
+    while worker.latest_jpeg is None and model.status in ["starting", "online"] and t_wait < 3.0:
+        await asyncio.sleep(0.1)
+        t_wait += 0.1
+
+    if worker.latest_jpeg is None and model.status in ["error", "disconnected"]:
+        raise HTTPException(status_code=503, detail=model.error_message or "Camera feed unavailable.")
 
     async def _mjpeg_generator():
-        while model.status in ["starting", "online"] and worker is not None:
+        consecutive_idle = 0
+        while model.status in ["starting", "online"] and worker is not None and not worker.stop_event.is_set():
             jpeg_bytes = worker.latest_jpeg
-            if jpeg_bytes:
+            if jpeg_bytes is not None:
+                consecutive_idle = 0
                 yield (
                     b"--frame\r\n"
                     b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
                 )
+            else:
+                consecutive_idle += 1
+                if consecutive_idle > 150:  # ~15 seconds without any frames
+                    break
             await asyncio.sleep(0.033)
 
     return StreamingResponse(
@@ -1325,14 +1507,44 @@ async def get_camera_telemetry_endpoint(camera_id: str):
     worker = camera_registry.get_worker(model.camera_id)
     if not worker or not worker.thread or not worker.thread.is_alive():
         return {
-            "status": "offline",
+            "status": model.status,
             "camera_id": model.camera_id,
-            "message": "Camera is offline. Start camera feed to begin telemetry generation.",
+            "is_analyzing": False,
+            "message": model.error_message or f"Camera is {model.status}.",
             "telemetry": None
         }
 
-    if worker.latest_telemetry:
-        tel = dict(worker.latest_telemetry)
+    if model.status == "error":
+        return {
+            "status": "error",
+            "camera_id": model.camera_id,
+            "is_analyzing": False,
+            "message": model.error_message or "Camera unavailable",
+            "telemetry": None
+        }
+
+    if model.status == "disconnected":
+        return {
+            "status": "disconnected",
+            "camera_id": model.camera_id,
+            "is_analyzing": False,
+            "message": model.error_message or "Camera disconnected",
+            "telemetry": None
+        }
+
+    is_analyzing = getattr(worker, "is_analyzing", False)
+
+    if model.status == "online" and not is_analyzing:
+        return {
+            "status": "online",
+            "camera_id": model.camera_id,
+            "is_analyzing": False,
+            "message": "Camera stream is live. Analysis is on standby.",
+            "telemetry": None
+        }
+
+    if model.status == "online" and (worker.latest_telemetry or worker.latest_metrics):
+        tel = dict(worker.latest_telemetry) if worker.latest_telemetry else dict(worker.latest_metrics)
         if worker.latest_metrics:
             for k, v in worker.latest_metrics.items():
                 if k not in tel:
@@ -1353,13 +1565,15 @@ async def get_camera_telemetry_endpoint(camera_id: str):
         return {
             "status": "online",
             "camera_id": model.camera_id,
+            "is_analyzing": True,
             "telemetry": tel
         }
 
     return {
-        "status": "starting",
+        "status": model.status,
         "camera_id": model.camera_id,
-        "message": "Camera worker is initializing. Telemetry will be available on first processed frame.",
+        "is_analyzing": is_analyzing,
+        "message": "Camera worker initializing or feed not active.",
         "telemetry": None
     }
 
@@ -1714,73 +1928,6 @@ async def get_global_traffic_stats():
     }
 
 
-# ── 14. /cameras/aggregate ──
-
-@app.get("/api/cameras/aggregate")
-async def get_cameras_aggregate():
-    """
-    Aggregate real-time metrics across all active cameras.
-    Used by the Dashboard KPI cards and TrafficAnalytics page.
-
-    Returns:
-        total_vehicles      : Sum of vehicle_count across all active cameras
-        avg_speed_kmh       : Mean average_speed_kmh across active cameras
-        avg_congestion_score: Mean congestion_score across active cameras
-        active_camera_count : Number of cameras currently processing
-        class_counts        : Aggregated per-class vehicle counts (car/truck/bus/motorcycle)
-        per_camera          : Per-camera breakdown list
-    """
-    per_camera = []
-    total_vehicles = 0
-    speed_sum = 0.0
-    score_sum = 0.0
-    active_count = 0
-    class_totals: dict = {"car": 0, "truck": 0, "bus": 0, "motorcycle": 0}
-
-    for cam in CAMERAS:
-        cid = cam["camera_id"]
-        state = _get_camera_state(cid)
-        m = state.get("metrics", {})
-
-        is_active = state.get("status") == "ONLINE"
-        count = m.get("vehicle_count", 0)
-        speed = m.get("average_speed_kmh", 0.0)
-        score = m.get("congestion_score", 0.0)
-        level = m.get("congestion_level", "FREE_FLOW")
-        cc    = m.get("class_counts", {})
-
-        if is_active and m:
-            active_count += 1
-            total_vehicles += count
-            speed_sum += speed
-            score_sum += score
-            for cls in class_totals:
-                class_totals[cls] += cc.get(cls, 0)
-
-        per_camera.append({
-            "id":                cam["camera_id"],
-            "name":              cam["camera_name"],
-            "status":            state.get("status", "OFFLINE"),
-            "vehicle_count":     count,
-            "average_speed_kmh": round(speed, 1),
-            "congestion_score":  round(score, 3),
-            "congestion_level":  level,
-            "class_counts":      cc,
-        })
-
-    avg_speed = round(speed_sum / active_count, 1) if active_count > 0 else 0.0
-    avg_score = round(score_sum / active_count, 3) if active_count > 0 else 0.0
-
-    return {
-        "active_camera_count":  active_count,
-        "total_vehicles":       total_vehicles,
-        "avg_speed_kmh":        avg_speed,
-        "avg_congestion_score": avg_score,
-        "class_counts":         class_totals,
-        "per_camera":           per_camera,
-    }
-
-
 # ── 15. /junction/overview ──
 
 @app.get("/api/junction/overview")
@@ -1853,25 +2000,25 @@ async def get_alerts():
                 active_alerts.insert(0, {
                     "alert_id": f"ALT-CRIT-{cam.camera_id}",
                     "camera_id": cam.camera_id,
-                    "location": f"{cam.road} — {cam.location}",
+                    "location": f"{cam.camera_id} · {cam.location}",
                     "severity": "CRITICAL",
-                    "level": "CRITICAL",
-                    "reason": f"Critical congestion detected ({c_score*100:.0f}% occupancy, {v_cnt} vehicles, {spd:.1f} km/h)",
-                    "action": "Activate alternate corridor diversion immediately.",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "status": "ACTIVE"
+                    "reason": f"Heavy congestion on {cam.road} ({v_cnt} vehicles detected · Road occupancy {c_score*100:.0f}%).",
+                    "action": "Diversion recommended.",
+                    "timestamp": "Just now",
+                    "status": "ACTIVE",
+                    "hasDiversion": True
                 })
             elif c_score >= 0.50:
                 active_alerts.append({
                     "alert_id": f"ALT-MOD-{cam.camera_id}",
                     "camera_id": cam.camera_id,
-                    "location": f"{cam.road} — {cam.location}",
-                    "severity": "WARNING",
-                    "level": "MODERATE",
-                    "reason": f"Moderate congestion building up ({v_cnt} vehicles, {spd:.1f} km/h)",
-                    "action": "Monitor corridor flow and prepare signal timing adjustment.",
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "status": "ACTIVE"
+                    "location": f"{cam.camera_id} · {cam.location}",
+                    "severity": "HIGH" if c_score >= 0.65 else "MODERATE",
+                    "reason": f"{v_cnt} vehicles detected · Road occupancy {c_score*100:.0f}%.",
+                    "action": "Monitor traffic conditions.",
+                    "timestamp": "Just now",
+                    "status": "ACTIVE",
+                    "hasDiversion": False
                 })
 
     return {

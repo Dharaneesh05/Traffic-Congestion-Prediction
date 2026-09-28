@@ -113,18 +113,18 @@ export default function OfficerFieldApp({ onSwitchMode }) {
 
     if (actionType === "ACCEPT") {
       updatedStatus = "ACCEPTED";
-      toastTitle = "✓ Diversion Plan ACCEPTED: Traffic rerouted onto NH544 Western Loop.";
+      toastTitle = "Diversion Plan ACCEPTED: Traffic rerouted onto NH544 Western Loop.";
     } else if (actionType === "ACKNOWLEDGE") {
       updatedStatus = "ACKNOWLEDGED";
-      toastTitle = "✓ Alert ACKNOWLEDGED: Field officer on scene managing intersection.";
+      toastTitle = "Alert ACKNOWLEDGED: Field officer on scene managing intersection.";
     } else if (actionType === "REJECT") {
       updatedStatus = "REJECTED";
-      toastTitle = "✕ Recommendation REJECTED: Manual officer intervention active.";
+      toastTitle = "Recommendation REJECTED: Manual officer intervention active.";
     } else if (actionType === "RESOLVE") {
       updatedStatus = "RESOLVED";
-      toastTitle = "✓ Clearance REPORTED: Nominal corridor flow restored.";
+      toastTitle = "Clearance REPORTED: Nominal corridor flow restored.";
     } else if (actionType === "NOTIFY") {
-      toastTitle = "📢 PATROL / TOW REQUESTED: Nearest highway response units dispatched.";
+      toastTitle = "PATROL / TOW REQUESTED: Nearest highway response units dispatched.";
     }
 
     if (activeAlert) {
@@ -191,9 +191,17 @@ export default function OfficerFieldApp({ onSwitchMode }) {
         <header className="officer-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="officer-badge-icon">
-                <Shield size={18} color="white" />
-              </div>
+              <img
+                src="/tn-police-logo.png"
+                alt="Tamil Nadu Police"
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  objectFit: "contain",
+                  display: "block",
+                  flexShrink: 0,
+                }}
+              />
               <div>
                 <div className="officer-title">TN TRAFFIC POLICE</div>
                 <div className="officer-sub">Field Officer • ID #4208 • Sector 4</div>
@@ -228,7 +236,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
           {activeAlert && activeAlert.status !== "RESOLVED" ? (
             <div className={`urgent-alert-card ${activeAlert.severity?.toLowerCase() || "critical"}`}>
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider">
+                <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider" style={{ color: "var(--status-critical, #F45E70)" }}>
                   <AlertTriangle size={15} />
                   <span>URGENT TRAFFIC ALERT • {activeAlert.severity}</span>
                 </div>
@@ -236,21 +244,21 @@ export default function OfficerFieldApp({ onSwitchMode }) {
                   {activeAlert.status}
                 </span>
               </div>
-              <div className="text-sm font-bold text-gray-900 mb-1">
+              <div className="text-sm font-bold mb-1" style={{ color: "var(--text-primary, #F4F5F7)" }}>
                 {activeAlert.approach}: {activeAlert.message}
               </div>
-              <div className="flex items-center gap-4 text-xs text-gray-600 mt-2">
+              <div className="flex items-center gap-4 text-xs mt-2" style={{ color: "var(--text-secondary, #A7ACB8)" }}>
                 <span className="flex items-center gap-1">
-                  <Clock size={12} /> Predicted worsening: <b>+15 min</b>
+                  <Clock size={12} /> Predicted worsening: <b style={{ color: "var(--text-primary, #F4F5F7)" }}>+15 min</b>
                 </span>
                 <span className="flex items-center gap-1">
-                  <Activity size={12} /> Severity: <b>{activeAlert.severity}</b>
+                  <Activity size={12} /> Severity: <b style={{ color: "var(--status-critical, #F45E70)" }}>{activeAlert.severity}</b>
                 </span>
               </div>
             </div>
           ) : (
             <div className="normal-status-card">
-              <CheckCircle2 size={16} className="text-emerald-600" />
+              <CheckCircle2 size={16} style={{ color: "var(--status-normal, #22C55E)" }} />
               <span>No critical emergency alerts active. Nominal flow on all sectors.</span>
             </div>
           )}
@@ -278,16 +286,16 @@ export default function OfficerFieldApp({ onSwitchMode }) {
                   onClick={() => setSelectedApproach(app.approach_id)}
                 >
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-xs truncate" title={app.approach_name}>
+                    <span className="font-bold text-xs truncate" style={{ color: "var(--text-primary, #F4F5F7)" }} title={app.approach_name}>
                       {app.approach_name.split("(")[0]}
                     </span>
                     <span className={`level-indicator ${app.congestion_level?.toLowerCase()}`}>
                       {app.congestion_level}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-1 text-xs text-gray-600 mt-2">
-                    <div>Vehicles: <b className="text-gray-900">{app.vehicle_count}</b></div>
-                    <div>Speed: <b className="text-gray-900">{app.average_speed_kmh} km/h</b></div>
+                  <div className="grid grid-cols-2 gap-1 text-xs mt-2" style={{ color: "var(--text-secondary, #A7ACB8)" }}>
+                    <div>Vehicles: <b style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{app.vehicle_count}</b></div>
+                    <div>Speed: <b style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{app.average_speed_kmh} km/h</b></div>
                   </div>
                 </div>
               ))}
@@ -371,56 +379,58 @@ export default function OfficerFieldApp({ onSwitchMode }) {
           {currentPlan ? (
             <div className="ai-rec-card">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5 font-bold text-xs text-emerald-800">
+                <div className="flex items-center gap-1.5 font-bold text-xs" style={{ color: "var(--accent-soft-blue, #7B8BC8)" }}>
                   <Navigation size={15} />
                   <span>DIVERSION RECOMMENDATION</span>
                 </div>
-                <span className="confidence-pill">{currentPlan.confidence}% Confidence</span>
+                <span className="confidence-pill" style={{ background: "rgba(123, 139, 200, 0.15)", color: "var(--accent-soft-blue, #7B8BC8)", border: "1px solid rgba(123, 139, 200, 0.35)", borderRadius: "3px", padding: "2px 6px", fontSize: "10px", fontWeight: 700 }}>
+                  {currentPlan.confidence}% Confidence
+                </span>
               </div>
 
               <div className="rec-body">
-                <div className="rec-action-text font-bold text-sm text-gray-900 mb-1">
+                <div className="rec-action-text font-bold text-sm mb-1" style={{ color: "var(--text-primary, #F4F5F7)" }}>
                   {currentPlan.police_action}
                 </div>
-                <div className="text-xs text-gray-600 mb-2">
-                  <b>Reason:</b> {currentPlan.reason}
+                <div className="text-xs mb-2" style={{ color: "var(--text-secondary, #A7ACB8)" }}>
+                  <b style={{ color: "var(--text-primary, #F4F5F7)" }}>Reason:</b> {currentPlan.reason}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 bg-emerald-50 p-2.5 rounded-lg text-center text-xs mb-3">
+                <div className="grid grid-cols-3 gap-2 p-2.5 rounded text-center text-xs mb-3" style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)" }}>
                   <div>
-                    <span className="text-gray-500 block text-[10px]">TIME SAVED</span>
-                    <b className="text-emerald-700 text-sm">~{currentPlan.time_saved_min} min</b>
+                    <span style={{ color: "var(--text-muted, #737987)", display: "block", fontSize: "10px" }}>TIME SAVED</span>
+                    <b style={{ color: "var(--status-normal, #22C55E)", fontSize: "0.875rem", fontFamily: "var(--font-mono)" }}>~{currentPlan.time_saved_min} min</b>
                   </div>
                   <div>
-                    <span className="text-gray-500 block text-[10px]">CLEARANCE</span>
-                    <b className="text-emerald-700 text-sm">{currentPlan.estimated_clearance_min} min</b>
+                    <span style={{ color: "var(--text-muted, #737987)", display: "block", fontSize: "10px" }}>CLEARANCE</span>
+                    <b style={{ color: "var(--status-normal, #22C55E)", fontSize: "0.875rem", fontFamily: "var(--font-mono)" }}>{currentPlan.estimated_clearance_min} min</b>
                   </div>
                   <div>
-                    <span className="text-gray-500 block text-[10px]">BYPASS DIST</span>
-                    <b className="text-emerald-700 text-sm">{currentPlan.alternate_distance_km} km</b>
+                    <span style={{ color: "var(--text-muted, #737987)", display: "block", fontSize: "10px" }}>BYPASS DIST</span>
+                    <b style={{ color: "var(--accent-soft-blue, #7B8BC8)", fontSize: "0.875rem", fontFamily: "var(--font-mono)" }}>{currentPlan.alternate_distance_km} km</b>
                   </div>
                 </div>
 
                 {/* Evidence / RAG SOP block */}
-                <div className="evidence-accordion" onClick={() => setExpandedPolicy(!expandedPolicy)}>
-                  <div className="flex items-center justify-between text-xs font-semibold text-gray-700 cursor-pointer">
+                <div className="evidence-accordion" onClick={() => setExpandedPolicy(!expandedPolicy)} style={{ borderTop: "1px solid var(--border-light, #2C303C)", paddingTop: "0.5rem" }}>
+                  <div className="flex items-center justify-between text-xs font-semibold cursor-pointer" style={{ color: "var(--text-primary, #F4F5F7)" }}>
                     <span className="flex items-center gap-1">
-                      <Info size={13} className="text-emerald-600" />
+                      <Info size={13} style={{ color: "var(--accent-soft-blue, #7B8BC8)" }} />
                       Legal Grounding & SOP Rules ({currentPlan.evidence?.length || 0} points)
                     </span>
                     <ChevronDown size={14} style={{ transform: expandedPolicy ? "rotate(180deg)" : "rotate(0)" }} />
                   </div>
                   {expandedPolicy && (
-                    <div className="mt-2 text-[11px] text-gray-600 border-t border-emerald-100 pt-2 flex flex-col gap-1">
+                    <div className="mt-2 text-[11px] pt-2 flex flex-col gap-1" style={{ color: "var(--text-secondary, #A7ACB8)", borderTop: "1px solid var(--border-light, #2C303C)" }}>
                       {currentPlan.evidence?.map((ev, i) => (
                         <div key={i} className="flex items-start gap-1">
-                          <span className="text-emerald-600">•</span>
+                          <span style={{ color: "var(--accent-soft-blue, #7B8BC8)" }}>•</span>
                           <span>{ev}</span>
                         </div>
                       ))}
                       {currentPlan.applicable_policy?.applicable_rules?.map((rule, idx) => (
-                        <div key={idx} className="flex items-start gap-1 text-gray-700 font-medium">
-                          <span className="text-blue-600 font-bold">IRC:</span>
+                        <div key={idx} className="flex items-start gap-1 font-medium" style={{ color: "var(--text-secondary, #A7ACB8)" }}>
+                          <span style={{ color: "var(--accent-soft-blue, #7B8BC8)", fontWeight: 700 }}>IRC:</span>
                           <span>{rule}</span>
                         </div>
                       ))}
@@ -431,7 +441,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
             </div>
           ) : (
             <div className="ai-rec-card empty">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+              <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-muted, #737987)" }}>
                 <Info size={15} />
                 <span>All approaches operating smoothly. No diversion required at this time.</span>
               </div>
@@ -440,7 +450,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
 
           {/* Quick Field Action Buttons */}
           <div className="field-actions-container">
-            <span className="text-xs font-bold text-gray-700 block mb-2">Officer Field Actions</span>
+            <span className="text-xs font-bold block mb-2" style={{ color: "var(--text-primary, #F4F5F7)" }}>Officer Field Actions</span>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <button
                 id="btn-officer-accept"
@@ -470,7 +480,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
                 onClick={() => handleAction("REJECT")}
               >
                 <XCircle size={14} />
-                <span>Override</span>
+                <span>Manual Control</span>
               </button>
               <button
                 id="btn-officer-resolve"
@@ -500,7 +510,7 @@ export default function OfficerFieldApp({ onSwitchMode }) {
             <Shield size={14} />
             <span>Switch to Control Room</span>
           </button>
-          <div className="text-[10px] text-gray-400 text-center mt-1">
+          <div className="text-[10px] text-center mt-1" style={{ color: "var(--text-muted, #737987)" }}>
             Tamil Nadu Traffic Authority • Field Response Subsystem
           </div>
         </footer>

@@ -117,12 +117,13 @@ export default function MobileCameraPage({ onBackToDashboard }) {
             display: "flex",
             alignItems: "center",
             gap: "0.25rem",
-            background: "#f1f5f9",
-            border: "1px solid #cbd5e1",
+            background: "var(--bg-surface-elevated, #252936)",
+            border: "1px solid var(--border-default, #3D3F4E)",
             borderRadius: "4px",
             padding: "0.4rem 0.75rem",
             fontSize: "0.75rem",
             fontWeight: 700,
+            color: "var(--text-primary, #F4F5F7)",
             cursor: "pointer",
           }}
         >
@@ -131,8 +132,8 @@ export default function MobileCameraPage({ onBackToDashboard }) {
         </button>
 
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "#0f172a" }}>MOBILE CCTV UNIT</div>
-          <div style={{ fontSize: "0.6875rem", color: "#64748b" }}>LAN: {lanIp}</div>
+          <div style={{ fontSize: "0.8125rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)" }}>MOBILE CCTV UNIT</div>
+          <div style={{ fontSize: "0.6875rem", color: "var(--text-secondary, #A7ACB8)", fontFamily: "var(--font-mono)" }}>LAN: {lanIp}</div>
         </div>
       </div>
 
@@ -140,14 +141,14 @@ export default function MobileCameraPage({ onBackToDashboard }) {
         style={{
           width: "100%",
           aspectRatio: "4/3",
-          background: "#0f172a",
-          borderRadius: "8px",
+          background: "#0d0f11",
+          borderRadius: "4px",
           overflow: "hidden",
           position: "relative",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          border: "2px solid #334155",
+          border: "1px solid var(--border-default, #3D3F4E)",
           marginBottom: "1rem",
         }}
       >
@@ -166,10 +167,10 @@ export default function MobileCameraPage({ onBackToDashboard }) {
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
         {!isStreaming && (
-          <div style={{ textAlign: "center", color: "#94a3b8", padding: "1rem" }}>
-            <Camera size={36} style={{ margin: "0 auto 0.5rem", opacity: 0.7 }} />
-            <div style={{ fontWeight: 700, color: "#f8fafc", fontSize: "0.875rem" }}>Mobile Camera Ready</div>
-            <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem" }}>
+          <div style={{ textAlign: "center", color: "var(--text-muted, #737987)", padding: "1rem" }}>
+            <Camera size={36} style={{ margin: "0 auto 0.5rem", opacity: 0.7, color: "var(--text-muted, #737987)" }} />
+            <div style={{ fontWeight: 700, color: "var(--text-primary, #F4F5F7)", fontSize: "0.875rem" }}>Mobile Camera Ready</div>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A7ACB8)", marginTop: "0.25rem" }}>
               Tap Start Live Stream to transmit rear camera frames to YOLO11 AI engine over Wi-Fi.
             </p>
           </div>
@@ -181,25 +182,26 @@ export default function MobileCameraPage({ onBackToDashboard }) {
               position: "absolute",
               top: 8,
               left: 8,
-              background: "rgba(15, 23, 42, 0.85)",
+              background: "rgba(17, 19, 21, 0.85)",
               color: "#ffffff",
               padding: "3px 8px",
-              borderRadius: "4px",
+              borderRadius: "3px",
               fontSize: "11px",
               fontWeight: 700,
               display: "flex",
               alignItems: "center",
               gap: "5px",
+              border: "1px solid var(--border-default, #3D3F4E)",
             }}
           >
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ef4444" }}></span>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--status-critical, #F45E70)" }}></span>
             STREAMING • {fps} FPS
           </div>
         )}
       </div>
 
       {errorMsg && (
-        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#991b1b", padding: "0.5rem 0.75rem", borderRadius: "4px", fontSize: "0.75rem", marginBottom: "1rem" }}>
+        <div style={{ background: "rgba(244, 94, 112, 0.12)", border: "1px solid rgba(244, 94, 112, 0.35)", color: "var(--status-critical, #F45E70)", padding: "0.5rem 0.75rem", borderRadius: "4px", fontSize: "0.75rem", marginBottom: "1rem" }}>
           <strong>Camera Error:</strong> {errorMsg}
         </div>
       )}
@@ -210,10 +212,10 @@ export default function MobileCameraPage({ onBackToDashboard }) {
             onClick={startStream}
             style={{
               padding: "0.75rem",
-              background: "#10b981",
+              background: "var(--accent-soft-blue, #7B8BC8)",
               color: "#ffffff",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: "3px",
               fontSize: "0.875rem",
               fontWeight: 800,
               cursor: "pointer",
@@ -231,10 +233,10 @@ export default function MobileCameraPage({ onBackToDashboard }) {
             onClick={stopStream}
             style={{
               padding: "0.75rem",
-              background: "#ef4444",
+              background: "var(--status-critical, #F45E70)",
               color: "#ffffff",
               border: "none",
-              borderRadius: "6px",
+              borderRadius: "3px",
               fontSize: "0.875rem",
               fontWeight: 800,
               cursor: "pointer",
@@ -253,10 +255,10 @@ export default function MobileCameraPage({ onBackToDashboard }) {
           onClick={switchCamera}
           style={{
             padding: "0.75rem",
-            background: "#f1f5f9",
-            color: "#0f172a",
-            border: "1px solid #cbd5e1",
-            borderRadius: "6px",
+            background: "var(--bg-surface-elevated, #252936)",
+            color: "var(--text-primary, #F4F5F7)",
+            border: "1px solid var(--border-default, #3D3F4E)",
+            borderRadius: "3px",
             fontSize: "0.75rem",
             fontWeight: 700,
             cursor: "pointer",
@@ -271,30 +273,30 @@ export default function MobileCameraPage({ onBackToDashboard }) {
         </button>
       </div>
 
-      <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "0.75rem" }}>
-        <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", marginBottom: "0.5rem" }}>
+      <div style={{ background: "var(--bg-surface, #1B2028)", border: "1px solid var(--border-default, #3D3F4E)", borderRadius: "4px", padding: "0.75rem" }}>
+        <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", marginBottom: "0.5rem" }}>
           Live Highway Telemetry (Camera: CCTV-MOBILE-01)
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem", textAlign: "center" }}>
-          <div style={{ background: "#f8fafc", padding: "0.5rem", borderRadius: "4px" }}>
-            <div style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>VEHICLES</div>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#0f172a" }}>
+          <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+            <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", fontWeight: 700 }}>VEHICLES</div>
+            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>
               {isStreaming ? (telemetry?.vehicles ?? "0") : "--"}
             </div>
           </div>
 
-          <div style={{ background: "#f8fafc", padding: "0.5rem", borderRadius: "4px" }}>
-            <div style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>SPEED</div>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#0284c7" }}>
+          <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+            <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", fontWeight: 700 }}>SPEED</div>
+            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--status-high, #F59E0B)", fontFamily: "var(--font-mono)" }}>
               {isStreaming ? `${telemetry?.speed?.toFixed(1) ?? "0.0"}` : "--"}
               {isStreaming && <span style={{ fontSize: "0.625rem" }}> km/h</span>}
             </div>
           </div>
 
-          <div style={{ background: "#f8fafc", padding: "0.5rem", borderRadius: "4px" }}>
-            <div style={{ fontSize: "0.625rem", color: "#64748b", fontWeight: 700 }}>CONGESTION</div>
-            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#10b981" }}>
+          <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+            <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", fontWeight: 700 }}>CONGESTION</div>
+            <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "var(--status-normal, #22C55E)", fontFamily: "var(--font-mono)" }}>
               {isStreaming ? `${((telemetry?.congestion ?? 0) * 100).toFixed(0)}%` : "--"}
             </div>
           </div>

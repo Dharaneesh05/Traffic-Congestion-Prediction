@@ -26,12 +26,12 @@ const HORIZONS = [
 
 const getColor = (level) => {
   switch (level) {
-    case "FREE_FLOW": return "var(--accent-success)";
+    case "FREE_FLOW": return "var(--status-normal, #22C55E)";
     case "LIGHT":     return "#34d399";
-    case "MODERATE":  return "var(--accent-warning)";
-    case "HEAVY":     return "var(--accent-orange)";
-    case "CONGESTED": return "var(--accent-danger)";
-    default:          return "var(--accent-primary)";
+    case "MODERATE":  return "var(--status-moderate, #C2BB91)";
+    case "HEAVY":     return "var(--status-high, #F59E0B)";
+    case "CONGESTED": return "var(--status-critical, #F45E70)";
+    default:          return "var(--accent-soft-blue, #7B8BC8)";
   }
 };
 
@@ -39,12 +39,12 @@ const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   const d = payload[0]?.payload;
   return (
-    <div className="glass-card" style={{ padding: "0.875rem 1rem", border: "1px solid rgba(255,255,255,0.1)", minWidth: 180 }}>
-      <p className="font-bold mb-2">{label} Forecast</p>
+    <div className="glass-card" style={{ padding: "0.875rem 1rem", border: "1px solid var(--border-default, #3D3F4E)", background: "var(--bg-surface-elevated, #252936)", minWidth: 180 }}>
+      <p className="font-bold mb-2" style={{ color: "var(--text-primary, #F4F5F7)" }}>{label} Forecast</p>
       <div className="flex flex-col gap-1 text-xs">
         <div className="flex justify-between gap-4">
           <span className="text-muted">Worst Case (q90):</span>
-          <span className="font-mono font-bold text-danger">{d?.q90?.toFixed(2)}</span>
+          <span className="font-mono font-bold" style={{ color: "var(--status-critical, #F45E70)" }}>{d?.q90?.toFixed(2)}</span>
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted">Expected (q50):</span>
@@ -52,10 +52,10 @@ const ChartTooltip = ({ active, payload, label }) => {
         </div>
         <div className="flex justify-between gap-4">
           <span className="text-muted">Best Case (q10):</span>
-          <span className="font-mono font-bold text-success">{d?.q10?.toFixed(2)}</span>
+          <span className="font-mono font-bold" style={{ color: "var(--status-normal, #22C55E)" }}>{d?.q10?.toFixed(2)}</span>
         </div>
       </div>
-      <div className="mt-2 pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+      <div className="mt-2 pt-2" style={{ borderTop: "1px solid var(--border-light, #2C303C)" }}>
         <CongestionBadge level={d?.level} />
       </div>
     </div>
@@ -116,7 +116,7 @@ export default function Prediction() {
           <div className="glass-card-flat" style={{ padding: "0.625rem 1rem" }}>
             <div className="text-xs text-muted mb-1">Model Status</div>
             <div className={`font-bold text-sm ${modelInfo.is_trained ? "text-success" : "text-warning"}`}>
-              {modelInfo.is_trained ? "✓ Trained Model" : "⚡ Heuristic Fallback"}
+              {modelInfo.is_trained ? "Trained Model" : "Heuristic Fallback"}
             </div>
           </div>
         )}
@@ -172,15 +172,15 @@ export default function Prediction() {
           <div style={{ flex: 1, minHeight: 300 }}>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light, #2C303C)" vertical={false} />
                 <XAxis dataKey="name" stroke="var(--text-muted)" fontSize={11} tick={{ fill: "var(--text-muted)" }} tickLine={false} />
                 <YAxis domain={[0, 1]} stroke="var(--text-muted)" fontSize={10} tick={{ fill: "var(--text-muted)" }} tickLine={false} axisLine={false} tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.02)" }} />
-                <ReferenceLine y={0.8} stroke="var(--accent-danger)" strokeDasharray="4 4"
-                  label={{ position: "insideTopLeft", value: "Congested Threshold", fill: "var(--accent-danger)", fontSize: 9 }} />
-                <ReferenceLine y={0.5} stroke="var(--accent-warning)" strokeDasharray="4 4"
-                  label={{ position: "insideTopLeft", value: "Heavy Threshold", fill: "var(--accent-warning)", fontSize: 9 }} />
-                <Bar dataKey="q50" name="Expected Score" radius={[5, 5, 0, 0]} isAnimationActive={false}>
+                <ReferenceLine y={0.8} stroke="var(--status-critical, #F45E70)" strokeDasharray="4 4"
+                  label={{ position: "insideTopLeft", value: "Congested Threshold", fill: "var(--status-critical, #F45E70)", fontSize: 9 }} />
+                <ReferenceLine y={0.5} stroke="var(--status-high, #F59E0B)" strokeDasharray="4 4"
+                  label={{ position: "insideTopLeft", value: "Heavy Threshold", fill: "var(--status-high, #F59E0B)", fontSize: 9 }} />
+                <Bar dataKey="q50" name="Expected Score" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                   {chartData.map((e, i) => (
                     <Cell key={i} fill={getColor(e.level)} opacity={e.extrapolated ? 0.55 : 0.9} />
                   ))}
@@ -202,7 +202,7 @@ export default function Prediction() {
                 const isMed  = d.q90 > 0.5 && !isHigh;
                 return (
                   <div key={i} className="flex justify-between items-center p-2 rounded-md"
-                    style={{ background: "rgba(255,255,255,0.025)" }}>
+                    style={{ background: "var(--bg-surface-secondary, #2C303C)" }}>
                     <div className="flex items-center gap-2 text-xs">
                       <Clock size={11} color="var(--text-muted)" />
                       {d.name}

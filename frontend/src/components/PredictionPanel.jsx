@@ -47,14 +47,14 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
     switch (level) {
       case "SEVERE":
       case "CRITICAL":
-        return { bg: "var(--state-red-subtle)", text: "var(--state-red)" };
+        return { bg: "rgba(244, 94, 112, 0.15)", text: "var(--status-critical, #F45E70)" };
       case "HIGH":
       case "HEAVY":
-        return { bg: "#ffedd5", text: "#c2410c" };
+        return { bg: "rgba(245, 158, 11, 0.15)", text: "var(--status-high, #F59E0B)" };
       case "MODERATE":
-        return { bg: "var(--state-amber-subtle)", text: "#92400e" };
+        return { bg: "rgba(194, 187, 145, 0.15)", text: "var(--status-moderate, #C2BB91)" };
       default:
-        return { bg: "var(--state-green-subtle)", text: "#065f46" };
+        return { bg: "rgba(34, 197, 94, 0.15)", text: "var(--status-normal, #22C55E)" };
     }
   };
 
@@ -63,18 +63,31 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
       <div className="card-header">
         <div>
           <h2 className="card-title">
-            <TrendingUp size={16} color="var(--state-purple)" />
-            TFT Multi-Horizon Congestion Prediction
+            <TrendingUp size={16} color="var(--accent-soft-blue, #7B8BC8)" />
+            Traffic Forecast
           </h2>
           <p className="card-subtitle">
-            Temporal Fusion Transformer (Quantiles: q10, q50, q90)
+            Expected congestion trend and quantile distribution
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="status-pill purple">
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.35rem",
+              padding: "0.2rem 0.5rem",
+              borderRadius: "2px",
+              fontSize: "0.6875rem",
+              fontWeight: 700,
+              background: "rgba(123, 139, 200, 0.15)",
+              color: "var(--accent-soft-blue, #7B8BC8)",
+              border: "1px solid rgba(123, 139, 200, 0.35)",
+            }}
+          >
             <Cpu size={12} />
-            {hasValidForecast ? "TFT Active" : "Waiting for History"}
+            {hasValidForecast ? "Forecast Active" : "Awaiting Telemetry"}
           </span>
         </div>
       </div>
@@ -151,14 +164,14 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
               <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorQ50" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor="var(--accent-soft-blue, #7B8BC8)" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="var(--accent-soft-blue, #7B8BC8)" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light, #2C303C)" vertical={false} />
+                <XAxis dataKey="time" stroke="var(--text-muted, #737987)" fontSize={10} tickLine={false} />
                 <YAxis
-                  stroke="#94a3b8"
+                  stroke="var(--text-muted, #737987)"
                   fontSize={10}
                   domain={[0, 1]}
                   tickFormatter={(v) => `${(v * 100).toFixed(0)}%`}
@@ -166,9 +179,10 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "6px",
+                    background: "var(--bg-surface-elevated, #252936)",
+                    border: "1px solid var(--border-default, #3D3F4E)",
+                    borderRadius: "4px",
+                    color: "var(--text-primary, #F4F5F7)",
                     fontSize: "11px",
                   }}
                   formatter={(val, name) => [
@@ -179,7 +193,7 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
                 <Area
                   type="monotone"
                   dataKey="q90"
-                  stroke="#cbd5e1"
+                  stroke="var(--text-muted, #737987)"
                   fill="transparent"
                   strokeDasharray="2 2"
                   name="q90"
@@ -187,7 +201,7 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
                 <Area
                   type="monotone"
                   dataKey="q50"
-                  stroke="#7c3aed"
+                  stroke="var(--accent-soft-blue, #7B8BC8)"
                   strokeWidth={2}
                   fill="url(#colorQ50)"
                   name="q50"
@@ -195,7 +209,7 @@ export default function PredictionPanel({ forecast, currentCongestion = null }) 
                 <Area
                   type="monotone"
                   dataKey="q10"
-                  stroke="#cbd5e1"
+                  stroke="var(--text-muted, #737987)"
                   fill="transparent"
                   strokeDasharray="2 2"
                   name="q10"

@@ -9,17 +9,17 @@ import { Brain, AlertTriangle, Eye, CheckCircle, RefreshCw } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion";
 
 const SEVERITY_CONFIG = {
-  HIGH:   { icon: AlertTriangle, color: "var(--accent-danger)",  label: "Critical Action" },
-  MEDIUM: { icon: Eye,           color: "var(--accent-warning)", label: "Monitor" },
-  LOW:    { icon: CheckCircle,   color: "var(--accent-success)", label: "Normal" },
+  HIGH:   { icon: AlertTriangle, color: "var(--status-critical, #F45E70)", label: "Critical Action" },
+  MEDIUM: { icon: Eye,           color: "var(--status-high, #F59E0B)",     label: "Monitor" },
+  LOW:    { icon: CheckCircle,   color: "var(--status-normal, #22C55E)",   label: "Normal" },
 };
 
 const STATUS_COLOR = {
-  CRITICAL:  "var(--accent-danger)",
-  ELEVATED:  "var(--accent-warning)",
-  NORMAL:    "var(--accent-primary)",
-  FREE_FLOW: "var(--accent-success)",
-  idle:      "var(--text-muted)",
+  CRITICAL:  "var(--status-critical, #F45E70)",
+  ELEVATED:  "var(--status-high, #F59E0B)",
+  NORMAL:    "var(--accent-soft-blue, #7B8BC8)",
+  FREE_FLOW: "var(--status-normal, #22C55E)",
+  idle:      "var(--text-muted, #737987)",
 };
 
 export default function AIPanel({ autoRefresh = true }) {
@@ -54,16 +54,16 @@ export default function AIPanel({ autoRefresh = true }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div style={{ padding: "6px", borderRadius: "8px", background: "rgba(139,92,246,0.15)" }}>
-            <Brain size={18} color="var(--accent-purple)" />
+          <div style={{ padding: "6px", borderRadius: "4px", background: "rgba(123, 139, 200, 0.15)" }}>
+            <Brain size={18} color="var(--accent-soft-blue, #7B8BC8)" />
           </div>
           <div>
-            <div className="font-bold text-sm">Agentic AI Recommendations</div>
+            <div className="font-bold text-sm" style={{ color: "var(--text-primary, #F4F5F7)" }}>Agentic AI Recommendations</div>
             <div className="text-xs text-muted">LangGraph Multi-Agent Analysis</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {loading && <div className="spinner" style={{ width: 14, height: 14, borderTopColor: "var(--accent-purple)" }} />}
+          {loading && <div className="spinner" style={{ width: 14, height: 14, borderTopColor: "var(--accent-soft-blue, #7B8BC8)" }} />}
           <button
             onClick={fetch}
             className="btn btn-ghost"
@@ -78,7 +78,7 @@ export default function AIPanel({ autoRefresh = true }) {
       {/* Network Status */}
       {report && (
         <div className="flex items-center justify-between mb-4 p-3 rounded-md"
-          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+          style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)" }}>
           <div>
             <div className="text-xs text-muted uppercase tracking-wider mb-1">Network Status</div>
             <div className="font-bold" style={{ color: statusColor }}>

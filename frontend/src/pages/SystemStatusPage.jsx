@@ -18,22 +18,22 @@ export default function SystemStatusPage({ health, routingStatus, cameraStatus }
               style={{
                 width: "36px",
                 height: "36px",
-                borderRadius: "var(--radius-xs)",
-                background: "var(--state-blue-subtle)",
-                border: "1px solid rgba(37, 99, 235, 0.2)",
+                borderRadius: "3px",
+                background: "rgba(123, 139, 200, 0.15)",
+                border: "1px solid rgba(123, 139, 200, 0.35)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--state-blue)",
+                color: "var(--accent-soft-blue, #7B8BC8)",
               }}
             >
-              <Server size={20} />
+              <Server size={18} />
             </div>
             <div>
-              <h2 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>
+              <h2 style={{ fontSize: "1rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", letterSpacing: "-0.01em" }}>
                 Infrastructure Health & Hardware Diagnostic Matrix
               </h2>
-              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>
+              <p style={{ fontSize: "0.75rem", color: "var(--text-muted, #737987)", fontWeight: 500 }}>
                 Real-time microservice status, neural model memory allocation, and OpenStreetMap spatial index
               </p>
             </div>
@@ -58,29 +58,29 @@ export default function SystemStatusPage({ health, routingStatus, cameraStatus }
         {/* OpenStreetMap Road Topology Engine */}
         <div className="card">
           <h3 className="card-title mb-2">
-            <Database size={14} color="var(--state-blue)" />
+            <Database size={14} color="var(--accent-soft-blue, #7B8BC8)" />
             OpenStreetMap Road Graph Architecture
           </h3>
 
           <div className="flex flex-col gap-2" style={{ fontSize: "0.75rem" }}>
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Spatial Topology Cache</span>
-              <strong style={{ fontFamily: "var(--font-mono)" }}>{cachePath}</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Spatial Topology Cache</span>
+              <strong style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary, #F4F5F7)" }}>{cachePath}</strong>
             </div>
 
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Total Road Nodes & Edges</span>
-              <strong>{nodeCount} Nodes • {edgeCount} Directed Edges</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Total Road Nodes & Edges</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>{nodeCount} Nodes • {edgeCount} Directed Edges</strong>
             </div>
 
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Spatial Indexing Engine</span>
-              <strong>Scipy KD-Tree (Sub-millisecond Euclidean Snapping)</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Spatial Indexing Engine</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>Scipy KD-Tree (Sub-millisecond Euclidean Snapping)</strong>
             </div>
 
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Routing Algorithm</span>
-              <strong>A* Shortest Path with On-the-Fly Dynamic Congestion Penalty</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Routing Algorithm</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>A* Shortest Path with On-the-Fly Dynamic Congestion Penalty</strong>
             </div>
           </div>
         </div>
@@ -88,29 +88,29 @@ export default function SystemStatusPage({ health, routingStatus, cameraStatus }
         {/* Neural Network & Computer Vision Stack */}
         <div className="card">
           <h3 className="card-title mb-2">
-            <Cpu size={14} color="var(--state-purple)" />
+            <Cpu size={14} color="var(--accent-soft-blue, #7B8BC8)" />
             Neural Inference & Telemetry Engine
           </h3>
 
           <div className="flex flex-col gap-2" style={{ fontSize: "0.75rem" }}>
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Object Detection Engine</span>
-              <strong>YOLO11n (CPU/GPU, IoU Threshold 0.45, Conf 0.25)</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Object Detection Engine</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>YOLO11n (CPU/GPU, IoU Threshold 0.45, Conf 0.25)</strong>
             </div>
 
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Multi-Object Tracking</span>
-              <strong>ByteTrack (120-frame Trajectory History Buffer)</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Multi-Object Tracking</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>ByteTrack (120-frame Trajectory History Buffer)</strong>
             </div>
 
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Time-Series Forecaster</span>
-              <strong>Temporal Fusion Transformer (models/tft.keras)</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Time-Series Forecaster</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>Temporal Fusion Transformer (models/tft.keras)</strong>
             </div>
 
-            <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-              <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Database & Persistence</span>
-              <strong>SQLite Fallback (backend/traffic_system.db)</strong>
+            <div style={{ background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)", padding: "0.5rem", borderRadius: "3px" }}>
+              <span style={{ color: "var(--text-muted, #737987)", fontSize: "0.6875rem", display: "block" }}>Database & Persistence</span>
+              <strong style={{ color: "var(--text-primary, #F4F5F7)" }}>SQLite Fallback (backend/traffic_system.db)</strong>
             </div>
           </div>
         </div>

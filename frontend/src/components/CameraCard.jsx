@@ -13,15 +13,15 @@
 
 import { useState, useEffect, useRef } from "react";
 import { startCamera, stopCamera, getCameraStats, configureCamera } from "../api";
-import { Play, Square, Settings, Wifi, Video, RefreshCw, Check, AlertCircle } from "lucide-react";
+import { Play, Square, Settings, Wifi, Video, RefreshCw, Check, AlertCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import CongestionBadge from "./CongestionBadge";
 
 const CLASS_CONFIG = [
-  { key: "car",        label: "Cars",  color: "#34d399" },
-  { key: "truck",      label: "Truck", color: "#fbbf24" },
-  { key: "bus",        label: "Bus",   color: "#f97316" },
-  { key: "motorcycle", label: "Bike",  color: "#a855f7" },
+  { key: "car",        label: "Cars",  color: "var(--status-normal, #22C55E)" },
+  { key: "truck",      label: "Truck", color: "var(--status-moderate, #C2BB91)" },
+  { key: "bus",        label: "Bus",   color: "var(--status-high, #F59E0B)" },
+  { key: "motorcycle", label: "Bike",  color: "var(--accent-soft-blue, #7B8BC8)" },
 ];
 
 export default function CameraCard({ camera, onRefresh }) {
@@ -114,30 +114,47 @@ export default function CameraCard({ camera, onRefresh }) {
 
   return (
     <motion.div
-      className="glass-card"
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", position: "relative" }}
+      style={{
+        background: "var(--bg-surface, #1B2028)",
+        border: "1px solid var(--border-default, #3D3F4E)",
+        borderRadius: "4px",
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        position: "relative",
+      }}
     >
       {/* Title Bar */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-sm text-gray-100">{camera.camera_name || camera.name}</span>
+            <span style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--text-primary, #F4F5F7)" }}>
+              {camera.camera_name || camera.name}
+            </span>
             <span className={`status-dot-tiny ${isActive ? "online" : "offline"}`} />
           </div>
-          <div className="text-[11px] text-gray-400 font-mono">
+          <div style={{ fontSize: "0.6875rem", color: "var(--text-secondary, #A7ACB8)", fontFamily: "var(--font-mono)" }}>
             {camera.camera_code || `CAM-${camera.id}`} • {camera.location}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            className="p-1 text-gray-400 hover:text-blue-400 bg-gray-800/40 rounded transition"
+            style={{
+              padding: "0.3rem",
+              color: "var(--text-secondary, #A7ACB8)",
+              background: "var(--bg-surface-elevated, #252936)",
+              border: "1px solid var(--border-default, #3D3F4E)",
+              borderRadius: "3px",
+              cursor: "pointer",
+            }}
             title="Configure Camera Stream Source"
             onClick={() => setShowConfig(!showConfig)}
           >
-            <Settings size={14} />
+            <Settings size={13} />
           </button>
           {isActive ? (
             <span className="badge-live-stream" style={{ fontSize: "10px", padding: "2px 6px" }}>
@@ -151,17 +168,31 @@ export default function CameraCard({ camera, onRefresh }) {
       </div>
 
       {/* Honest Source Badge */}
-      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-900/60 border border-white/5 rounded text-[10px] text-gray-300">
-        <Wifi size={10} className={isActive ? "text-emerald-400" : "text-gray-500"} />
-        <span className="font-semibold text-gray-300 truncate">{sourceLabel}</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.375rem",
+          padding: "0.2rem 0.5rem",
+          background: "var(--bg-surface-elevated, #252936)",
+          border: "1px solid var(--border-default, #3D3F4E)",
+          borderRadius: "3px",
+          fontSize: "0.625rem",
+          color: "var(--text-secondary, #A7ACB8)",
+        }}
+      >
+        <Wifi size={10} color={isActive ? "var(--status-normal, #22C55E)" : "var(--text-muted, #737987)"} />
+        <span style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {sourceLabel}
+        </span>
       </div>
 
       {/* Camera Viewport Area */}
-      <div className="camera-viewport" style={{ background: "#05070a", height: 180, position: "relative", borderRadius: 8, overflow: "hidden" }}>
+      <div className="camera-viewport" style={{ background: "#0d0f11", height: 180, position: "relative", borderRadius: 4, overflow: "hidden", border: "1px solid var(--border-default, #3D3F4E)" }}>
         {/* Animated Background Overlay */}
         <div style={{
           position: "absolute", inset: 0,
-          background: "linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(10,15,25,0.95) 100%)",
+          background: "linear-gradient(180deg, rgba(17,19,21,0.6) 0%, rgba(13,15,17,0.95) 100%)",
         }} />
 
         {/* Live MJPEG Stream Image with Real YOLO11 & ByteTrack Overlays */}
@@ -192,18 +223,18 @@ export default function CameraCard({ camera, onRefresh }) {
         {/* Standby / Waiting indicator */}
         {!isActive ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" style={{ zIndex: 3 }}>
-            <Video size={24} className="text-gray-600 mb-1" />
-            <div className="text-[11px] font-mono text-gray-400 font-bold tracking-wider">
+            <Video size={24} style={{ color: "var(--text-muted, #737987)", marginBottom: "0.25rem" }} />
+            <div style={{ fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "var(--text-secondary, #A7ACB8)", fontWeight: 700, letterSpacing: "0.05em" }}>
               FEED OFFLINE • CLICK START TO ANALYSE
             </div>
-            <div className="text-[10px] text-gray-500">
+            <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)" }}>
               YOLO11 + ByteTrack AI Standby
             </div>
           </div>
         ) : !hasData ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ zIndex: 3, background: "rgba(0,0,0,0.6)" }}>
-            <RefreshCw size={20} className="animate-spin text-blue-400" />
-            <div className="text-[11px] font-mono text-blue-300 font-bold">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ zIndex: 3, background: "rgba(0,0,0,0.7)" }}>
+            <RefreshCw size={20} className="animate-spin" style={{ color: "var(--accent-soft-blue, #7B8BC8)" }} />
+            <div style={{ fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "var(--accent-soft-blue, #7B8BC8)", fontWeight: 700 }}>
               INGESTING FRAMES & ACQUIRING TRACKS...
             </div>
           </div>
@@ -223,7 +254,7 @@ export default function CameraCard({ camera, onRefresh }) {
 
         {/* Real Vehicle Count Overlay */}
         {hasData && (
-          <div className="absolute bottom-6 right-2 z-10 bg-black/70 border border-white/10 px-2 py-0.5 rounded text-[11px] font-mono text-emerald-400 font-bold">
+          <div style={{ position: "absolute", bottom: 6, right: 8, zIndex: 10, background: "rgba(0,0,0,0.75)", border: "1px solid var(--border-default, #3D3F4E)", padding: "2px 6px", borderRadius: 3, fontSize: "0.6875rem", fontFamily: "var(--font-mono)", color: "var(--status-normal, #22C55E)", fontWeight: 700 }}>
             {count} Vehicles Detected (Unique Tracks)
           </div>
         )}
@@ -237,20 +268,39 @@ export default function CameraCard({ camera, onRefresh }) {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             onSubmit={handleSaveConfig}
-            className="p-3 bg-gray-900/90 border border-blue-500/30 rounded-lg text-xs flex flex-col gap-2"
+            style={{
+              padding: "0.75rem",
+              background: "var(--bg-surface-elevated, #252936)",
+              border: "1px solid var(--border-default, #3D3F4E)",
+              borderRadius: "4px",
+              fontSize: "0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}
           >
-            <div className="font-bold text-gray-200 flex items-center justify-between">
+            <div style={{ fontWeight: 700, color: "var(--text-primary, #F4F5F7)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span>Configure Input Stream</span>
-              <button type="button" onClick={() => setShowConfig(false)} className="text-gray-400 hover:text-white">✕</button>
+              <button type="button" onClick={() => setShowConfig(false)} style={{ background: "none", border: "none", color: "var(--text-muted, #737987)", cursor: "pointer" }} aria-label="Close">
+                <X size={14} />
+              </button>
             </div>
             
-            <div className="flex gap-2">
-              <label className="flex-1">
-                <span className="text-[10px] text-gray-400 block mb-0.5">Source Type:</span>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <label style={{ flex: 1 }}>
+                <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", display: "block", marginBottom: "0.25rem" }}>Source Type:</span>
                 <select
                   value={sourceType}
                   onChange={(e) => setSourceType(e.target.value)}
-                  className="w-full bg-black/60 border border-gray-700 rounded px-2 py-1 text-gray-200 text-xs"
+                  style={{
+                    width: "100%",
+                    background: "var(--bg-app, #111315)",
+                    border: "1px solid var(--border-default, #3D3F4E)",
+                    borderRadius: "3px",
+                    padding: "0.35rem 0.5rem",
+                    color: "var(--text-primary, #F4F5F7)",
+                    fontSize: "0.75rem",
+                  }}
                 >
                   <option value="ip_camera">Mobile IP Camera (Phone Stream URL)</option>
                   <option value="webcam">Local Laptop Camera (Webcam Index)</option>
@@ -260,7 +310,7 @@ export default function CameraCard({ camera, onRefresh }) {
             </div>
 
             <label>
-              <span className="text-[10px] text-gray-400 block mb-0.5">
+              <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", display: "block", marginBottom: "0.25rem" }}>
                 {sourceType === "ip_camera" ? "Stream URL (e.g. http://192.168.1.100:8080/video):"
                  : sourceType === "webcam" ? "Device Index (e.g. 0 for internal, 1 for external):"
                  : "File Path (e.g. datasets/videos/Traffic.mp4):"}
@@ -270,14 +320,35 @@ export default function CameraCard({ camera, onRefresh }) {
                 value={sourceUri}
                 onChange={(e) => setSourceUri(e.target.value)}
                 placeholder="Enter IP stream URL or webcam index"
-                className="w-full bg-black/60 border border-gray-700 rounded px-2 py-1 text-gray-200 text-xs font-mono"
+                style={{
+                  width: "100%",
+                  background: "var(--bg-app, #111315)",
+                  border: "1px solid var(--border-default, #3D3F4E)",
+                  borderRadius: "3px",
+                  padding: "0.35rem 0.5rem",
+                  color: "var(--text-primary, #F4F5F7)",
+                  fontSize: "0.75rem",
+                  fontFamily: "var(--font-mono)",
+                }}
               />
             </label>
 
-            <div className="flex justify-end gap-2 pt-1">
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", paddingTop: "0.25rem" }}>
               <button
                 type="submit"
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-xs flex items-center gap-1"
+                style={{
+                  padding: "0.35rem 0.75rem",
+                  background: "var(--accent-soft-blue, #7B8BC8)",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "3px",
+                  fontWeight: 700,
+                  fontSize: "0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  cursor: "pointer",
+                }}
               >
                 {saveSuccess ? <><Check size={12} /> Saved!</> : "Apply Stream URL"}
               </button>
@@ -288,56 +359,66 @@ export default function CameraCard({ camera, onRefresh }) {
 
       {/* Real per-class vehicle counts from YOLO11 */}
       {hasData ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-4 gap-1.5">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.375rem" }}>
           {CLASS_CONFIG.map((item) => (
-            <div key={item.key} className="text-center p-1.5 rounded bg-black/40 border border-white/5">
-              <div className="font-bold font-mono text-sm" style={{ color: item.color }}>
+            <div key={item.key} style={{ textAlign: "center", padding: "0.375rem", borderRadius: "3px", background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)" }}>
+              <div style={{ fontWeight: 700, fontFamily: "var(--font-mono)", fontSize: "0.875rem", color: item.color }}>
                 {classCounts[item.key] ?? 0}
               </div>
-              <div className="text-[10px] text-gray-400">{item.label}</div>
+              <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)" }}>{item.label}</div>
             </div>
           ))}
         </motion.div>
       ) : (
-        <div className="grid grid-cols-4 gap-1.5">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.375rem" }}>
           {CLASS_CONFIG.map((item) => (
-            <div key={item.key} className="text-center p-1.5 rounded bg-black/20 border border-white/5">
-              <div className="font-bold font-mono text-sm text-gray-600">—</div>
-              <div className="text-[10px] text-gray-500">{item.label}</div>
+            <div key={item.key} style={{ textAlign: "center", padding: "0.375rem", borderRadius: "3px", background: "var(--bg-surface-elevated, #252936)", border: "1px solid var(--border-default, #3D3F4E)" }}>
+              <div style={{ fontWeight: 700, fontFamily: "var(--font-mono)", fontSize: "0.875rem", color: "var(--text-muted, #737987)" }}>—</div>
+              <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)" }}>{item.label}</div>
             </div>
           ))}
         </div>
       )}
 
       {/* Metrics Bar with Section 13 Speed Calibration Disclosure */}
-      <div className="flex items-center justify-between pt-1 border-t border-white/5 text-xs text-gray-300">
-        <div className="flex flex-col">
-          <span className="text-[10px] text-gray-400">SPEED (ESTIMATED):</span>
-          <span className="font-mono font-bold text-amber-400">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "0.25rem", borderTop: "1px solid var(--border-light, #2C303C)", fontSize: "0.75rem", color: "var(--text-secondary, #A7ACB8)" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)" }}>SPEED (ESTIMATED):</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--status-high, #F59E0B)" }}>
             {hasData ? `${speed.toFixed(0)} km/h*` : "NO DATA"}
           </span>
         </div>
 
-        <div className="flex flex-col text-right">
-          <span className="text-[10px] text-gray-400">CONGESTION:</span>
-          <span className="font-mono font-bold text-blue-400">
+        <div style={{ display: "flex", flexDirection: "column", textAlign: "right" }}>
+          <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)" }}>CONGESTION:</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--accent-soft-blue, #7B8BC8)" }}>
             {hasData ? `${(score * 100).toFixed(0)}%` : "NO DATA"}
           </span>
         </div>
       </div>
 
       {/* Speed Calibration Disclaimer (Section 13) */}
-      <div className="text-[9px] text-gray-500 italic">
+      <div style={{ fontSize: "0.5625rem", color: "var(--text-muted, #737987)", fontStyle: "italic" }}>
         *Relative motion tracker. Physical km/h requires per-approach camera calibration.
       </div>
 
       {/* Action Button */}
       <button
-        className={`w-full py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-          isActive
-            ? "bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30"
-            : "bg-emerald-600 hover:bg-emerald-500 text-white shadow"
-        }`}
+        style={{
+          width: "100%",
+          padding: "0.5rem",
+          borderRadius: "3px",
+          fontSize: "0.75rem",
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "0.375rem",
+          cursor: loading ? "not-allowed" : "pointer",
+          background: isActive ? "rgba(244, 94, 112, 0.15)" : "var(--accent-soft-blue, #7B8BC8)",
+          color: isActive ? "var(--status-critical, #F45E70)" : "#ffffff",
+          border: isActive ? "1px solid rgba(244, 94, 112, 0.35)" : "none",
+        }}
         disabled={loading}
         onClick={handleToggle}
       >

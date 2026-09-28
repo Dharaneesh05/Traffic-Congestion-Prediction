@@ -29,7 +29,7 @@ export default function TrafficCharts({ telemetryHistory = [] }) {
         <div className="card-header">
           <div>
             <h3 className="card-title">
-              <Car size={14} color="var(--state-green)" />
+              <Car size={14} color="var(--status-normal, #22C55E)" />
               Detected Vehicles Inflow Curve
             </h3>
             <p className="card-subtitle">YOLO11 real-time vehicle accumulation</p>
@@ -50,24 +50,25 @@ export default function TrafficCharts({ telemetryHistory = [] }) {
           {hasHistory ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={telemetryHistory} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={9} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} domain={[0, 'auto']} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light, #2C303C)" vertical={false} />
+                <XAxis dataKey="time" stroke="var(--text-muted, #737987)" fontSize={9} tickLine={false} />
+                <YAxis stroke="var(--text-muted, #737987)" fontSize={9} tickLine={false} domain={[0, 'auto']} />
                 <Tooltip
                   contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "6px",
+                    background: "var(--bg-surface-elevated, #252936)",
+                    border: "1px solid var(--border-default, #3D3F4E)",
+                    borderRadius: "4px",
+                    color: "var(--text-primary, #F4F5F7)",
                     fontSize: "11px",
                   }}
                 />
-                <ReferenceLine y={avgVehicles} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: `Avg ${avgVehicles}`, fill: '#94a3b8', fontSize: 9 }} />
+                <ReferenceLine y={avgVehicles} stroke="var(--text-muted, #737987)" strokeDasharray="3 3" label={{ value: `Avg ${avgVehicles}`, fill: 'var(--text-muted, #737987)', fontSize: 9 }} />
                 <Line
                   type="monotone"
                   dataKey="vehicles"
-                  stroke="#10b981"
+                  stroke="var(--status-normal, #22C55E)"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: "#10b981" }}
+                  dot={{ r: 2, fill: "var(--status-normal, #22C55E)" }}
                   name="Vehicles"
                 />
               </LineChart>
@@ -99,7 +100,7 @@ export default function TrafficCharts({ telemetryHistory = [] }) {
         <div className="card-header">
           <div>
             <h3 className="card-title">
-              <Gauge size={14} color="var(--state-amber)" />
+              <Gauge size={14} color="var(--status-high, #F59E0B)" />
               Calibrated Velocity Curve
             </h3>
             <p className="card-subtitle">Pixel-calibrated corridor speed (km/h)</p>
@@ -120,24 +121,25 @@ export default function TrafficCharts({ telemetryHistory = [] }) {
           {hasHistory ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={telemetryHistory} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="time" stroke="#94a3b8" fontSize={9} tickLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} domain={[0, 'auto']} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-light, #2C303C)" vertical={false} />
+                <XAxis dataKey="time" stroke="var(--text-muted, #737987)" fontSize={9} tickLine={false} />
+                <YAxis stroke="var(--text-muted, #737987)" fontSize={9} tickLine={false} domain={[0, 'auto']} />
                 <Tooltip
                   contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "6px",
+                    background: "var(--bg-surface-elevated, #252936)",
+                    border: "1px solid var(--border-default, #3D3F4E)",
+                    borderRadius: "4px",
+                    color: "var(--text-primary, #F4F5F7)",
                     fontSize: "11px",
                   }}
                 />
-                <ReferenceLine y={Number(avgSpeed)} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: `Avg ${avgSpeed}`, fill: '#94a3b8', fontSize: 9 }} />
+                <ReferenceLine y={Number(avgSpeed)} stroke="var(--text-muted, #737987)" strokeDasharray="3 3" label={{ value: `Avg ${avgSpeed}`, fill: 'var(--text-muted, #737987)', fontSize: 9 }} />
                 <Line
                   type="monotone"
                   dataKey="speed"
-                  stroke="#f59e0b"
+                  stroke="var(--status-high, #F59E0B)"
                   strokeWidth={2}
-                  dot={{ r: 2, fill: "#f59e0b" }}
+                  dot={{ r: 2, fill: "var(--status-high, #F59E0B)" }}
                   name="Speed (km/h)"
                 />
               </LineChart>

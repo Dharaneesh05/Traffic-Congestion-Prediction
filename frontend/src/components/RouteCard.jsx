@@ -29,59 +29,62 @@ export default function RouteCard({ strategy, data, isRecommended, onClick, acti
       style={{
         width: "100%",
         textAlign: "left",
-        background: active ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.02)",
-        border: `1px solid ${active ? "rgba(59,130,246,0.35)" : "rgba(255,255,255,0.06)"}`,
-        borderRadius: "12px",
-        padding: "0.875rem 1rem",
+        background: active ? "var(--bg-surface-elevated, #252936)" : "var(--bg-surface, #1B2028)",
+        border: `1px solid ${active ? "var(--accent-soft-blue, #7B8BC8)" : "var(--border-default, #3D3F4E)"}`,
+        borderLeft: active ? "3px solid var(--accent-soft-blue, #7B8BC8)" : "1px solid var(--border-default, #3D3F4E)",
+        borderRadius: "4px",
+        padding: "0.75rem 0.875rem",
         cursor: "pointer",
-        transition: "all 0.2s ease",
-        color: "var(--text-primary)",
-        fontFamily: "var(--font-family)",
+        transition: "all 0.15s ease",
+        color: "var(--text-primary, #F4F5F7)",
+        fontFamily: "var(--font-sans)",
         position: "relative",
       }}
     >
       {isRecommended && (
         <div style={{
-          position: "absolute", top: -10, right: 12,
-          background: "var(--accent-primary)",
-          color: "white", fontSize: "0.6rem", fontWeight: 800,
-          padding: "2px 8px", borderRadius: "999px",
-          letterSpacing: "0.08em",
+          position: "absolute", top: -8, right: 10,
+          background: "var(--accent-soft-blue, #7B8BC8)",
+          color: "#111315", fontSize: "0.5625rem", fontWeight: 800,
+          padding: "2px 6px", borderRadius: "2px",
+          letterSpacing: "0.05em",
         }}>
-          ★ RECOMMENDED
+          RECOMMENDED
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-2">
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
         <div style={{
-          width: 32, height: 32, borderRadius: "8px",
-          background: active ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.04)",
+          width: 28, height: 28, borderRadius: "4px",
+          background: active ? "rgba(123, 139, 200, 0.15)" : "var(--bg-surface-secondary, #2C303C)",
           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
         }}>
-          <Icon size={15} color={active ? "var(--accent-primary)" : "var(--text-secondary)"} />
+          <Icon size={14} color={active ? "var(--accent-soft-blue, #7B8BC8)" : "var(--text-secondary, #A7ACB8)"} />
         </div>
         <div>
-          <div className="font-bold text-sm">{cfg.label}</div>
-          <div className="text-xs text-muted">{cfg.subtitle}</div>
+          <div style={{ fontWeight: 700, fontSize: "0.8125rem", color: "var(--text-primary, #F4F5F7)" }}>{cfg.label}</div>
+          <div style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)" }}>{cfg.subtitle}</div>
         </div>
-        <div className="ml-auto">
+        <div style={{ marginLeft: "auto" }}>
           <CongestionBadge level={level} />
         </div>
       </div>
 
-      <div className="flex gap-4 mt-2">
-        <div className="flex items-center gap-1 text-xs text-secondary">
+      <div style={{ display: "flex", gap: "1rem", marginTop: "0.375rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.6875rem", color: "var(--text-secondary, #A7ACB8)" }}>
           <Navigation2 size={11} />
-          <span className="font-mono font-bold text-primary">{dist} km</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>{dist} km</span>
         </div>
-        <div className="flex items-center gap-1 text-xs text-secondary">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.6875rem", color: "var(--text-secondary, #A7ACB8)" }}>
           <Clock size={11} />
-          <span className="font-mono font-bold text-primary">{time} min</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>{time} min</span>
         </div>
-        <div className="flex items-center gap-1 text-xs text-secondary">
+        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.6875rem", color: "var(--text-secondary, #A7ACB8)" }}>
           <AlertTriangle size={11} />
-          <span className="font-mono font-bold" style={{
-            color: score > 0.5 ? "var(--accent-danger)" : score > 0.3 ? "var(--accent-warning)" : "var(--accent-success)"
+          <span style={{
+            fontFamily: "var(--font-mono)",
+            fontWeight: 700,
+            color: score > 0.5 ? "var(--status-critical, #F45E70)" : score > 0.3 ? "var(--status-high, #F59E0B)" : "var(--status-normal, #22C55E)"
           }}>
             {(score * 100).toFixed(0)}%
           </span>

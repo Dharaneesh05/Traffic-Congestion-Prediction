@@ -171,6 +171,23 @@ CAMERAS: list = [
         "lon":           77.8650,
         "status":        "OFFLINE",
     },
+    {
+        "camera_id":     "CAM_TPR_01",
+        "camera_code":   "CCTV-TPR-01",
+        "camera_name":   "Kumaran Road: North Inflow",
+        "junction_id":   "JUNC_TIRUPPUR_01",
+        "approach_id":   "APP_TPR_NORTH",
+        "approach_name": "Kumaran Road (North Inflow)",
+        "location":      "Tiruppur Central, Tamil Nadu",
+        "address":       "Kumaran Road, Old Bus Stand, Tiruppur - 641601",
+        "source_type":   "video",
+        "source":        str(VIDEO_DIR / "Traffic.mp4"),
+        "source_uri":    str(VIDEO_DIR / "Traffic.mp4"),
+        "source_label":  "TIRUPPUR STATION CCTV (Traffic.mp4)",
+        "lat":           11.1075,
+        "lon":           77.3456,
+        "status":        "OFFLINE",
+    },
 ]
 
 

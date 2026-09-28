@@ -1,87 +1,147 @@
-import React from "react";
+import React, { useMemo } from "react";
 import RoutePlanner from "../components/RoutePlanner";
-import RouteComparison from "../components/RouteComparison";
+import RouteComparison, { getMonitoredLocationsAlongRoute } from "../components/RouteComparison";
 import TrafficMap from "../components/TrafficMap";
-import { Navigation2, MapPin, Clock, Zap, ShieldCheck } from "lucide-react";
+import { trafficService } from "../services/trafficService";
 
 export default function RoutePlannerPage({
   locations = [],
   onPlanRoute,
   isLoadingRoute = false,
   routeResult = null,
-  activeStrategy = "forecast",
+  activeStrategy = "recommended",
   setActiveStrategy,
-  fromLocation = "Salem Bus Stand",
-  toLocation = "Erode Bus Stand",
+  fromLocation = "",
+  toLocation = "",
   cameraTelemetry = null,
+  areaJunctions = [],
+  selectedJunction = null,
+  onSelectJunction = null,
+  selectedLocation = null,
+  onSelectLocation = null,
+  onSelectCamera = null,
+  alerts = [],
+  forecast = null,
+  diversionData = null,
+  onEvaluateDiversion = null,
+  onClearRoute = null,
 }) {
-  const activeData = routeResult ? routeResult[activeStrategy] : null;
+  // Combine all statewide junctions
+  const allStatewideJunctions = useMemo(() => {
+    const list = [...(trafficService.allJunctions || []), ...(areaJunctions || [])];
+    const unique = new Map();
+    list.forEach((j) => {
+      if (!j) return;
+      const key = (j.name || j.id || "").trim().toLowerCase();
+      if (key && !unique.has(key)) {
+        unique.set(key, j);
+      }
+    });
+    return Array.from(unique.values());
+  }, [areaJunctions]);
+
+  // Determine active route waypoints
+  const activeRoute = (activeStrategy === "alternative" && routeResult?.alternative)
+    ? routeResult.alternative
+    : (activeStrategy === "congested" && routeResult?.congested)
+    ? routeResult.congested
+    : (routeResult?.recommended || routeResult?.forecast || routeResult?.distance);
+
+  const activeWaypoints = activeRoute?.waypoints || [];
+
+  const routeJunctions = useMemo(() => {
+    return getMonitoredLocationsAlongRoute(activeWaypoints, allStatewideJunctions, 4.5);
+  }, [activeWaypoints, allStatewideJunctions]);
+
+  const mapJunctions = routeJunctions.length > 0 ? routeJunctions : areaJunctions;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: "1.25rem", alignItems: "start" }}>
-        {/* Left Column: Form Controls & Comparison Table */}
-        <div className="flex flex-col gap-4">
-          <RoutePlanner
-            locations={locations}
-            onPlanRoute={onPlanRoute}
-            isLoading={isLoadingRoute}
-            selectedFrom={fromLocation}
-            selectedTo={toLocation}
-          />
+    <div
+      style={{
+        display: "flex",
+        height: "100%",
+        width: "100%",
+        overflow: "hidden",
+        background: "var(--bg-app, #111315)",
+      }}
+    >
+      {/* Left Operational Column: Controls & Route Assessment */}
+      <div
+        style={{
+          width: "400px",
+          minWidth: "380px",
+          maxWidth: "420px",
+          height: "100%",
+          overflowY: "auto",
+          background: "var(--bg-sidebar, #1B2028)",
+          borderRight: "1px solid var(--border-default, #3D3F4E)",
+          padding: "0.75rem 0.875rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.625rem",
+          flexShrink: 0,
+          boxSizing: "border-box",
+        }}
+      >
+        <RoutePlanner
+          locations={locations}
+          onPlanRoute={onPlanRoute}
+          isLoading={isLoadingRoute}
+          selectedFrom={fromLocation}
+          selectedTo={toLocation}
+          selectedJunction={selectedJunction}
+          routeResult={routeResult}
+          onClearRoute={onClearRoute}
+          onLocationChange={() => {
+            if (routeResult && onClearRoute) onClearRoute();
+          }}
+        />
 
-          {routeResult && (
-            <RouteComparison
-              routeResult={routeResult}
-              activeStrategy={activeStrategy}
-              onSelectStrategy={(strat) => setActiveStrategy && setActiveStrategy(strat)}
-            />
-          )}
-
-          {/* Active Route Step Summary */}
-          {activeData && activeData.found && (
-            <div className="card">
-              <h3 className="card-title mb-2">
-                <ShieldCheck size={14} color="var(--state-green)" />
-                Selected Trajectory Summary ({activeStrategy.toUpperCase()})
-              </h3>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "0.75rem" }}>
-                <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Origin Node</span>
-                  <strong>{activeData.origin?.name || fromLocation}</strong>
-                </div>
-
-                <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Destination Node</span>
-                  <strong>{activeData.destination?.name || toLocation}</strong>
-                </div>
-
-                <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Total Distance</span>
-                  <strong>{(activeData.metrics.total_distance_m / 1000.0).toFixed(2)} km</strong>
-                </div>
-
-                <div style={{ background: "var(--bg-card-subtle)", padding: "0.5rem", borderRadius: "var(--radius-xs)" }}>
-                  <span style={{ color: "var(--text-muted)", fontSize: "0.6875rem", display: "block" }}>Estimated Time</span>
-                  <strong>{activeData.metrics.total_time_min.toFixed(1)} min</strong>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column: Live OSM Map displaying route */}
-        <div className="flex flex-col gap-4">
-          <TrafficMap
+        {routeResult && (
+          <RouteComparison
             routeResult={routeResult}
             activeStrategy={activeStrategy}
-            cameraTelemetry={cameraTelemetry}
+            onSelectStrategy={(strat) => setActiveStrategy && setActiveStrategy(strat)}
+            areaJunctions={allStatewideJunctions}
+            selectedJunction={selectedJunction}
+            onSelectJunction={onSelectJunction}
+            onSelectLocation={onSelectLocation}
+            alerts={alerts}
+            forecast={forecast}
+            diversionData={diversionData}
+            onEvaluateDiversion={onEvaluateDiversion}
             fromLocation={fromLocation}
             toLocation={toLocation}
-            isFullPage={true}
           />
-        </div>
+        )}
+      </div>
+
+      {/* Right Column: Dominant MapLibre/OSM Interactive Map */}
+      <div
+        style={{
+          flex: 1,
+          height: "100%",
+          minWidth: 0,
+          position: "relative",
+          background: "var(--bg-app, #111315)",
+        }}
+      >
+        <TrafficMap
+          routeResult={routeResult}
+          activeStrategy={activeStrategy}
+          cameraTelemetry={cameraTelemetry}
+          fromLocation={fromLocation}
+          toLocation={toLocation}
+          areaJunctions={mapJunctions}
+          selectedJunction={selectedJunction}
+          onSelectJunction={onSelectJunction}
+          selectedLocation={selectedLocation}
+          onSelectCamera={onSelectCamera}
+          diversionData={diversionData}
+          alerts={alerts}
+          isFullPage={true}
+          hideOverlayControls={false}
+        />
       </div>
     </div>
   );

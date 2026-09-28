@@ -170,9 +170,9 @@ class AlertAndAuditManager:
                 approach="North Approach (NH544)",
                 camera_id="CAM001",
                 timestamp=time.time(),
-                message="Officer field intervention action logged.",
+                message="Officer field intervention recorded.",
                 evidence=["Field officer manual dispatch"],
-                status="ACCEPTED"
+                status="ACTION ACCEPTED"
             )
             self.alerts[alert_id] = alert
 
@@ -180,13 +180,16 @@ class AlertAndAuditManager:
         if action == "ACKNOWLEDGE":
             alert.status = "ACKNOWLEDGED"
             alert.acknowledged_at = now
-        elif action == "ACCEPT":
-            alert.status = "ACCEPTED"
+        elif action in ["ACCEPT", "ACCEPT_DIVERSION"]:
+            alert.status = "ACTION ACCEPTED"
             alert.action_taken = "DIVERSION_EXECUTED"
-        elif action == "REJECT":
-            alert.status = "REJECTED"
+        elif action in ["REJECT", "REJECT_DIVERSION"]:
+            alert.status = "ACTION REJECTED"
             alert.action_taken = "OVERRIDDEN_BY_OFFICER"
-        elif action == "RESOLVE":
+        elif action in ["OVERRIDE"]:
+            alert.status = "ACTION OVERRIDDEN"
+            alert.action_taken = "MANUAL_OVERRIDE"
+        elif action in ["RESOLVE"]:
             alert.status = "RESOLVED"
             alert.resolved_at = now
             alert.action_taken = "CONGESTION_CLEARED"

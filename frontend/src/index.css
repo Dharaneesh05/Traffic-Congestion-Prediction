@@ -1,54 +1,203 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap');
 @import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  /* ── Color Palette — Restrained Enterprise Control Room Theme ── */
-  --bg-app:             #f8fafc;
-  --bg-sidebar:         #ffffff;
-  --bg-header:          #ffffff;
-  --bg-card:            #ffffff;
-  --bg-card-subtle:     #f8fafc;
-  --bg-card-hover:      #f1f5f9;
-  --bg-input:           #ffffff;
+  /* ── Color Palette — Tamil Nadu Traffic Police Official Restrained Theme ── */
+  --bg-app:             #F5F7FA;
+  --bg-sidebar:         #FFFFFF;
+  --bg-header:          #FFFFFF;
+  --bg-card:            #FFFFFF;
+  --bg-card-subtle:     #F8FAFC;
+  --bg-card-hover:      #F1F5F9;
+  --bg-input:           #FFFFFF;
 
-  --text-primary:       #0f172a;
-  --text-secondary:     #334155;
-  --text-muted:         #64748b;
-  --text-light:         #94a3b8;
+  --navy-primary:       #0F1B33;
+  --navy-dark:          #111827;
+  --navy-secondary:     #243552;
+  --navy-pill-active:   #E8EEF7;
 
-  --border-light:       #f1f5f9;
-  --border-default:     #e2e8f0;
-  --border-strong:      #cbd5e1;
-  --border-focus:       #2563eb;
+  --text-primary:       #0F1B33;
+  --text-secondary:     #243552;
+  --text-muted:         #64748B;
+  --text-light:         #94A3B8;
+
+  --border-light:       #EBF0F5;
+  --border-default:     #D7DEE8;
+  --border-strong:      #B9C6D5;
+  --border-focus:       #2563EB;
 
   /* ── Functional State Colors Only ── */
-  --state-green:        #10b981;
-  --state-green-subtle: #ecfdf5;
-  --state-amber:        #f59e0b;
-  --state-amber-subtle: #fffbeb;
-  --state-red:          #ef4444;
-  --state-red-subtle:   #fef2f2;
-  --state-blue:         #2563eb;
-  --state-blue-subtle:  #eff6ff;
-  --state-purple:       #7c3aed;
-  --state-purple-subtle:#f5f3ff;
+  --state-green:        #16A34A;
+  --state-green-subtle: #F0FDF4;
+  --state-amber:        #C58A00;
+  --state-amber-subtle: #FEF9C3;
+  --state-orange:       #EA580C;
+  --state-orange-subtle:#FFF7ED;
+  --state-red:          #DC2626;
+  --state-red-subtle:   #FEF2F2;
+  --state-blue:         #2563EB;
+  --state-blue-subtle:  #EFF6FF;
 
-  /* ── Shadows ── */
-  --shadow-xs:          0 1px 2px 0 rgba(0, 0, 0, 0.04);
-  --shadow-sm:          0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-  --shadow-md:          0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  --shadow-lg:          0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  /* ── Shadows (Restrained / Minimal) ── */
+  --shadow-xs:          0 1px 2px rgba(15, 27, 51, 0.04);
+  --shadow-sm:          0 1px 2px rgba(15, 27, 51, 0.04);
+  --shadow-md:          0 2px 4px rgba(15, 27, 51, 0.05);
+  --shadow-lg:          0 4px 12px rgba(15, 27, 51, 0.08);
 
-  /* ── Typography ── */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* ── Typography (Inter with Noto Sans Tamil fallback) ── */
+  --font-sans: 'Inter', 'Noto Sans Tamil', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* ── Radii ── */
-  --radius-xs:   4px;
-  --radius-sm:   6px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
+  /* ── Radii (Crisp 4-6px max) ── */
+  --radius-xs:   3px;
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   6px;
   --radius-full: 9999px;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Sleek Dark Professional Scrollbar System (Eliminates wide white browser scrollbars)
+   ──────────────────────────────────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2D3340 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2D3340;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3E4776;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Hide scrollbar utility class */
+.hide-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Subtle Operational Progressive Reveal (120-180ms)
+   ──────────────────────────────────────────────────────────────────────────── */
+@keyframes operationalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.operational-reveal-1 {
+  animation: operationalFadeIn 130ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.operational-reveal-2 {
+  animation: operationalFadeIn 150ms cubic-bezier(0.16, 1, 0.3, 1) 30ms both;
+}
+.operational-reveal-3 {
+  animation: operationalFadeIn 160ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
+}
+.operational-reveal-4 {
+  animation: operationalFadeIn 170ms cubic-bezier(0.16, 1, 0.3, 1) 90ms both;
+}
+
+/* ── Global Density Preferences ── */
+[data-density="compact"] {
+  font-size: 13px;
+}
+
+[data-density="compact"] .main-content-scroll {
+  padding: 0.625rem 0.875rem !important;
+}
+
+[data-density="compact"] table th,
+[data-density="compact"] table td {
+  padding-top: 0.3rem !important;
+  padding-bottom: 0.3rem !important;
+}
+
+/* ── Global Theme Preferences ── */
+[data-theme="dark"] {
+  /* ── Core Surfaces (Reference Palette: Charcoal #111315, Slate #1B2028, Elevated #252936) ── */
+  --bg-app:             #111315;
+  --bg-surface:         #1B2028;
+  --bg-surface-elevated:#252936;
+  --bg-surface-secondary:#2C303C;
+  --bg-sidebar:         #1B2028;
+  --bg-header:          #1B2028;
+  --bg-card:            #1B2028;
+  --bg-card-subtle:     #252936;
+  --bg-card-hover:      #2C303C;
+  --bg-input:           #252936;
+
+  /* ── Typography & Information Hierarchy ── */
+  --text-primary:       #F4F5F7;
+  --text-secondary:     #A7ACB8;
+  --text-muted:         #737987;
+  --text-subtle:        #626876;
+  --text-light:         #626876;
+
+  /* ── Structural Borders ── */
+  --border-light:       #2C303C;
+  --border-default:     #3D3F4E;
+  --border-strong:      #4A4E5D;
+  --border-focus:       #7B8BC8;
+
+  /* ── Muted Indigo & Blue Accents ── */
+  --accent-muted-blue:  #596070;
+  --accent-indigo:      #3E4776;
+  --accent-soft-blue:   #7B8BC8;
+  --navy-pill-active:   #252936;
+
+  /* ── Traffic Operational Semantic Colors ── */
+  --status-normal:      #22C55E;
+  --status-moderate:    #C2BB91;
+  --status-high:        #F59E0B;
+  --status-critical:    #F45E70;
+  --status-offline:     #F45E70;
+  --status-online:      #22C55E;
+  --status-route:       #7B8BC8;
+  --status-active:      #7B8BC8;
+
+  --state-green:        #22C55E;
+  --state-green-subtle: rgba(34, 197, 94, 0.12);
+  --state-amber:        #C2BB91;
+  --state-amber-subtle: rgba(194, 187, 145, 0.12);
+  --state-orange:       #F59E0B;
+  --state-orange-subtle:rgba(245, 158, 11, 0.12);
+  --state-red:          #F45E70;
+  --state-red-subtle:   rgba(244, 94, 112, 0.12);
+  --state-blue:         #7B8BC8;
+  --state-blue-subtle:  rgba(123, 139, 200, 0.12);
+
+  /* ── Operational Shadows (Minimal) ── */
+  --shadow-xs:          0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm:          0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md:          0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg:          0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -672,3 +821,563 @@ html, body {
 .font-mono { font-family: var(--font-mono); }
 .font-semibold { font-weight: 600; }
 .font-bold { font-weight: 700; }
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Officer Map Popup - Compact Control Room Mini-Card
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.officer-map-popup .maplibregl-popup-content {
+  padding: 0 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.3), 0 6px 12px -2px rgba(0, 0, 0, 0.2) !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+  font-family: var(--font-sans) !important;
+}
+
+.officer-map-popup .maplibregl-popup-close-button {
+  padding: 3px 7px !important;
+  font-size: 15px !important;
+  color: #94a3b8 !important;
+  top: 4px !important;
+  right: 4px !important;
+  z-index: 10 !important;
+  outline: none !important;
+  border-radius: 3px !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.officer-map-popup .maplibregl-popup-close-button:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.officer-map-popup .maplibregl-popup-tip {
+  border-top-color: #ffffff !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Map Location / Junction Marker & Hover Tooltip
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.map-junction-marker-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.map-junction-marker-wrapper:hover {
+  z-index: 9999 !important;
+}
+
+.map-junction-hover-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 6px 9px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 99999;
+  animation: fadeIn 0.12s ease;
+}
+
+.map-junction-hover-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #0f172a transparent transparent transparent;
+}
+
+.map-junction-marker-wrapper:hover .map-junction-hover-tooltip {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.map-junction-marker-wrapper:hover .map-junction-badge-pill {
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45) !important;
+  filter: brightness(1.08);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Operational Traffic Control Workstation (70/30 Split)
+   ──────────────────────────────────────────────────────────────────────────── */
+.workstation-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.workstation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2.3fr) minmax(385px, 1fr);
+  gap: 0.875rem;
+  align-items: start;
+}
+
+@media (max-width: 1120px) {
+  .workstation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.context-panel-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card, #FFFFFF);
+  border: 1px solid var(--border-default, #D7DEE8);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.context-tab-bar {
+  display: flex;
+  background: var(--bg-card-subtle, #F8FAFC);
+  border-bottom: 1px solid var(--border-default, #D7DEE8);
+  overflow-x: hidden;
+}
+
+.context-tab-button {
+  flex: 1;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748B);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.context-tab-button:hover:not(:disabled) {
+  color: var(--text-primary, #0F1B33);
+  background: var(--bg-card-hover, #F1F5F9);
+}
+
+.context-tab-button.active {
+  color: var(--text-primary, #0F1B33);
+  font-weight: 800;
+  background: var(--bg-card, #FFFFFF);
+  border-bottom: 2px solid var(--accent-soft-blue, #2563EB);
+}
+
+.context-tab-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.context-tab-badge {
+  font-size: 0.5625rem;
+  font-weight: 800;
+  background: var(--status-critical, #DC2626);
+  color: #FFFFFF;
+  padding: 1px 5px;
+  border-radius: 10px;
+  line-height: 1.2;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Police Officer Mobile / Field Tactical Interface
+   ──────────────────────────────────────────────────────────────────────────── */
+.officer-app-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100%;
+  padding: 0.5rem;
+  background: var(--bg-app, #111315);
+}
+
+.officer-mobile-container {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-surface, #1B2028);
+  border: 1px solid var(--border-default, #3D3F4E);
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.officer-header {
+  padding: 0.75rem 1rem;
+  background: var(--bg-surface, #1B2028);
+  border-bottom: 1px solid var(--border-default, #3D3F4E);
+}
+
+.officer-title {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--text-primary, #F4F5F7);
+}
+
+.officer-sub {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-muted, #737987);
+}
+
+.officer-toast {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 4px;
+  background: var(--bg-surface-elevated, #252936);
+  border: 1px solid var(--border-strong, #4A4E5D);
+  color: var(--text-primary, #F4F5F7);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.officer-toast.success {
+  border-left: 3px solid var(--status-normal, #22C55E);
+  color: var(--text-primary, #F4F5F7);
+}
+
+.officer-toast.warning {
+  border-left: 3px solid var(--status-high, #F59E0B);
+}
+
+.officer-toast.error {
+  border-left: 3px solid var(--status-critical, #F45E70);
+}
+
+.officer-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+}
+
+.urgent-alert-card {
+  padding: 0.75rem;
+  background: rgba(244, 94, 112, 0.08);
+  border: 1px solid rgba(244, 94, 112, 0.35);
+  border-left: 4px solid var(--status-critical, #F45E70);
+  border-radius: 4px;
+}
+
+.urgent-alert-card.warning,
+.urgent-alert-card.high {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  border-left-color: var(--status-high, #F59E0B);
+}
+
+.alert-status-pill {
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.alert-status-pill.pending {
+  background: rgba(244, 94, 112, 0.2);
+  color: var(--status-critical, #F45E70);
+  border: 1px solid rgba(244, 94, 112, 0.4);
+}
+
+.alert-status-pill.active,
+.alert-status-pill.acknowledged {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--status-high, #F59E0B);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.alert-status-pill.resolved {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--status-normal, #22C55E);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+
+.normal-status-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-left: 4px solid var(--status-normal, #22C55E);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-primary, #F4F5F7);
+}
+
+.section-block {
+  padding: 0.7rem;
+  background: var(--bg-surface, #1B2028);
+  border: 1px solid var(--border-default, #3D3F4E);
+  border-radius: 4px;
+}
+
+.section-heading {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #A7ACB8);
+}
+
+.status-badge-mini {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.status-badge-mini.critical {
+  background: rgba(244, 94, 112, 0.15);
+  color: var(--status-critical, #F45E70);
+  border: 1px solid rgba(244, 94, 112, 0.35);
+}
+
+.status-badge-mini.warning,
+.status-badge-mini.elevated {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--status-high, #F59E0B);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.status-badge-mini.nominal {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--status-normal, #22C55E);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
+.approach-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.approach-card {
+  padding: 0.55rem;
+  background: var(--bg-surface-elevated, #252936);
+  border: 1px solid var(--border-default, #3D3F4E);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.approach-card:hover {
+  background: var(--bg-card-hover, #2C303C);
+}
+
+.approach-card.selected {
+  border-color: var(--accent-soft-blue, #7B8BC8);
+  box-shadow: 0 0 0 1px var(--accent-soft-blue, #7B8BC8);
+}
+
+.approach-card.critical {
+  border-left: 3px solid var(--status-critical, #F45E70);
+}
+
+.approach-card.moderate {
+  border-left: 3px solid var(--status-moderate, #C2BB91);
+}
+
+.approach-card.nominal,
+.approach-card.light,
+.approach-card.free_flow {
+  border-left: 3px solid var(--status-normal, #22C55E);
+}
+
+.approach-card.warning,
+.approach-card.elevated,
+.approach-card.high {
+  border-left: 3px solid var(--status-high, #F59E0B);
+}
+
+.level-indicator {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 2px;
+  text-transform: uppercase;
+}
+
+.level-indicator.critical {
+  background: rgba(244, 94, 112, 0.15);
+  color: var(--status-critical, #F45E70);
+}
+
+.level-indicator.moderate {
+  background: rgba(194, 187, 145, 0.15);
+  color: var(--status-moderate, #C2BB91);
+}
+
+.level-indicator.nominal,
+.level-indicator.light,
+.level-indicator.free_flow {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--status-normal, #22C55E);
+}
+
+.officer-map-frame {
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-default, #3D3F4E);
+}
+
+.ai-rec-card {
+  padding: 0.75rem;
+  background: var(--bg-surface, #1B2028);
+  border: 1px solid var(--border-default, #3D3F4E);
+  border-left: 4px solid var(--accent-soft-blue, #7B8BC8);
+  border-radius: 4px;
+}
+
+.ai-rec-card.empty {
+  border-left-color: var(--border-default, #3D3F4E);
+}
+
+.field-actions-container {
+  padding: 0.75rem;
+  background: var(--bg-surface, #1B2028);
+  border: 1px solid var(--border-default, #3D3F4E);
+  border-radius: 4px;
+}
+
+.officer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.officer-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.officer-btn.btn-accept {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--status-normal, #22C55E);
+  border: 1px solid var(--status-normal, #22C55E);
+}
+
+.officer-btn.btn-accept:hover:not(:disabled) {
+  background: var(--status-normal, #22C55E);
+  color: #FFFFFF;
+}
+
+.officer-btn.btn-ack {
+  background: rgba(123, 139, 200, 0.15);
+  color: var(--accent-soft-blue, #7B8BC8);
+  border: 1px solid var(--accent-soft-blue, #7B8BC8);
+}
+
+.officer-btn.btn-ack:hover:not(:disabled) {
+  background: var(--accent-soft-blue, #7B8BC8);
+  color: #111315;
+}
+
+.officer-btn.btn-reject {
+  background: rgba(244, 94, 112, 0.12);
+  color: var(--status-critical, #F45E70);
+  border: 1px solid rgba(244, 94, 112, 0.4);
+}
+
+.officer-btn.btn-reject:hover:not(:disabled) {
+  background: var(--status-critical, #F45E70);
+  color: #FFFFFF;
+}
+
+.officer-btn.btn-resolve {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--status-normal, #22C55E);
+  border: 1px solid var(--border-default, #3D3F4E);
+}
+
+.officer-btn.btn-resolve:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: var(--status-normal, #22C55E);
+}
+
+.officer-btn.btn-notify {
+  background: rgba(194, 187, 145, 0.12);
+  color: var(--status-moderate, #C2BB91);
+  border: 1px solid var(--border-default, #3D3F4E);
+}
+
+.officer-btn.btn-notify:hover:not(:disabled) {
+  background: rgba(194, 187, 145, 0.22);
+  border-color: var(--status-moderate, #C2BB91);
+}
+
+.officer-footer {
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-surface, #1B2028);
+  border-top: 1px solid var(--border-default, #3D3F4E);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.switch-mode-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background: var(--bg-surface-elevated, #252936);
+  border: 1px solid var(--border-default, #3D3F4E);
+  color: var(--text-primary, #F4F5F7);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.switch-mode-btn:hover {
+  background: var(--bg-card-hover, #2C303C);
+  border-color: var(--accent-soft-blue, #7B8BC8);
+}
+
+

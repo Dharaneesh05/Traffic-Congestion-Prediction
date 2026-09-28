@@ -126,7 +126,7 @@ export default function LocationSearch({ placeholder, value, onChange, icon }) {
               className="autocomplete-item"
               onMouseDown={() => handleSelect(loc)}
             >
-              <MapPin size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
+              <MapPin size={14} color="var(--accent-soft-blue, #7B8BC8)" style={{ flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: "0.875rem" }}>{loc.name}</div>
                 <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>
