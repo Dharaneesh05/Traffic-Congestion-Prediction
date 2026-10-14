@@ -1,5 +1,551 @@
 [
   {
+    "entry_id": "AUD_1791905021338_bbb546",
+    "timestamp": 1791905021.3395934,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791905021",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791884417983_8c0d7b",
+    "timestamp": 1791884417.98395,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791884417",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791882099001_5d6083",
+    "timestamp": 1791882099.0012589,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791882099",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791880878309_70ac20",
+    "timestamp": 1791880878.3095052,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791880878",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791792293761_9787ec",
+    "timestamp": 1791792293.761134,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791792293",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791783132970_09f1e0",
+    "timestamp": 1791783132.9707804,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791783132",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791615018853_db0079",
+    "timestamp": 1791615018.8538008,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791615018",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791584321606_975943",
+    "timestamp": 1791584321.6068625,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791584321",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791537981537_63e340",
+    "timestamp": 1791537981.5378368,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791537981",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791537881839_e66c90",
+    "timestamp": 1791537881.839183,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791537881",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1791390090456_54c1df",
+    "timestamp": 1791390090.4561255,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1791390090",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790740115413_d6eb46",
+    "timestamp": 1790740115.4135296,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790740115",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790692948729_73719d",
+    "timestamp": 1790692948.7297523,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790692948",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790692724324_8bd399",
+    "timestamp": 1790692724.3241055,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790692724",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790690875423_bbd9aa",
+    "timestamp": 1790690875.423271,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790690875",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790677329574_63afcd",
+    "timestamp": 1790677329.574425,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790677329",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790676096046_289400",
+    "timestamp": 1790676096.0463793,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790676096",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790673830930_2422f6",
+    "timestamp": 1790673830.9303331,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790673830",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790673085488_9371a7",
+    "timestamp": 1790673085.488885,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790673085",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790672571896_43a176",
+    "timestamp": 1790672571.8960238,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790672571",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790672168164_57a87d",
+    "timestamp": 1790672168.1649694,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790672168",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790670768522_a4aab0",
+    "timestamp": 1790670768.5222185,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790670768",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790663211672_79269a",
+    "timestamp": 1790663211.6726162,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790663211",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790660385710_90a14d",
+    "timestamp": 1790660385.7109601,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790660385",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790657506890_2d478e",
+    "timestamp": 1790657506.8906848,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790657506",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790653648914_616564",
+    "timestamp": 1790653648.914037,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790653648",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790651608432_abbca4",
+    "timestamp": 1790651608.4328954,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790651608",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790650331011_4981df",
+    "timestamp": 1790650331.011019,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790650331",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790647358104_e73e7d",
+    "timestamp": 1790647358.104014,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790647358",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790644391555_3262a5",
+    "timestamp": 1790644391.5561354,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790644391",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790615025814_5c9836",
+    "timestamp": 1790615025.8142288,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790615025",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790613633720_b87dc4",
+    "timestamp": 1790613633.7237525,
+    "action": "OFFICER_REJECT",
+    "actor": "OFFICER_TN_HQ",
+    "junction": "Sankagiri Junction",
+    "approach": "North Approach (NH544)",
+    "details": {
+      "alert_id": "jnc-slm-skg",
+      "action": "REJECT",
+      "notes": "Sankagiri Junction \u00b7 Diversion rejected \u00b7 Standard signal timing retained \u00b7 10:10 PM",
+      "diversion_plan_id": null
+    }
+  },
+  {
+    "entry_id": "AUD_1790611500134_9d638f",
+    "timestamp": 1790611500.1347957,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790611500",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790610666126_9668b8",
+    "timestamp": 1790610666.1268935,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790610666",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790609056619_ec5f06",
+    "timestamp": 1790609056.6191337,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790609056",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790607652998_09fac5",
+    "timestamp": 1790607652.99811,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790607652",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790606148598_b60c6c",
+    "timestamp": 1790606148.5983658,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790606148",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790601202601_cc1a0a",
+    "timestamp": 1790601202.6010818,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790601202",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
+    "entry_id": "AUD_1790600383166_cee25d",
+    "timestamp": 1790600383.1664698,
+    "action": "ALERT_GENERATED",
+    "actor": "SYSTEM_AI",
+    "junction": "Sankagiri Junction",
+    "approach": "North: NH544 Salem Inflow",
+    "details": {
+      "alert_id": "ALT_CAM001_1790600383",
+      "severity": "CRITICAL",
+      "score": 0.86,
+      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
+    }
+  },
+  {
     "entry_id": "AUD_1790589656214_d2cb61",
     "timestamp": 1790589656.2148173,
     "action": "ALERT_GENERATED",
@@ -2251,552 +2797,6 @@
       "severity": "CRITICAL",
       "score": 0.86,
       "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1789462620753_a0135c",
-    "timestamp": 1789462620.755959,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0729",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Coastal Port Road Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1789462310694_30c4a3",
-    "timestamp": 1789462310.6940222,
-    "action": "ALERT_GENERATED",
-    "actor": "SYSTEM_AI",
-    "junction": "Sankagiri Junction",
-    "approach": "North: NH544 Salem Inflow",
-    "details": {
-      "alert_id": "ALT_CAM001_1789462310",
-      "severity": "CRITICAL",
-      "score": 0.86,
-      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1789461758250_e8e2d0",
-    "timestamp": 1789461758.2502635,
-    "action": "ALERT_GENERATED",
-    "actor": "SYSTEM_AI",
-    "junction": "Sankagiri Junction",
-    "approach": "North: NH544 Salem Inflow",
-    "details": {
-      "alert_id": "ALT_CAM001_1789461758",
-      "severity": "CRITICAL",
-      "score": 0.86,
-      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1789057627544_de544f",
-    "timestamp": 1789057627.5440772,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-7539",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1789057512990_d2fbf3",
-    "timestamp": 1789057512.9907572,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-2984",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for ALERT",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1789057510511_c5da1d",
-    "timestamp": 1789057510.5110786,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0500",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for ALERT",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1789057509440_3896ab",
-    "timestamp": 1789057509.4407425,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9428",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for ALERT",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1789057391503_bc8ece",
-    "timestamp": 1789057391.5037677,
-    "action": "ALERT_GENERATED",
-    "actor": "SYSTEM_AI",
-    "junction": "Sankagiri Junction",
-    "approach": "North: NH544 Salem Inflow",
-    "details": {
-      "alert_id": "ALT_CAM001_1789057391",
-      "severity": "CRITICAL",
-      "score": 0.86,
-      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1788961689954_3284b6",
-    "timestamp": 1788961689.9542327,
-    "action": "ALERT_GENERATED",
-    "actor": "SYSTEM_AI",
-    "junction": "Sankagiri Junction",
-    "approach": "North: NH544 Salem Inflow",
-    "details": {
-      "alert_id": "ALT_CAM001_1788961689",
-      "severity": "CRITICAL",
-      "score": 0.86,
-      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1788946855399_e7d700",
-    "timestamp": 1788946855.3999355,
-    "action": "ALERT_GENERATED",
-    "actor": "SYSTEM_AI",
-    "junction": "Sankagiri Junction",
-    "approach": "North: NH544 Salem Inflow",
-    "details": {
-      "alert_id": "ALT_CAM001_1788946855",
-      "severity": "CRITICAL",
-      "score": 0.86,
-      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1788939222472_a24733",
-    "timestamp": 1788939222.472813,
-    "action": "ALERT_GENERATED",
-    "actor": "SYSTEM_AI",
-    "junction": "Sankagiri Junction",
-    "approach": "North: NH544 Salem Inflow",
-    "details": {
-      "alert_id": "ALT_CAM001_1788939222",
-      "severity": "CRITICAL",
-      "score": 0.86,
-      "message": "Critical congestion detected at North: NH544 Salem Inflow. Standstill conditions (Score: 0.86)."
-    }
-  },
-  {
-    "entry_id": "AUD_1788879718968_3c9d57",
-    "timestamp": 1788879718.969642,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-8960",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Vedaranyam Main Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878017655_1c279b",
-    "timestamp": 1788878017.6557627,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-7647",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878016418_13ca9e",
-    "timestamp": 1788878016.4187522,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-6411",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878011476_054870",
-    "timestamp": 1788878011.476598,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-1468",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878011254_fb3d1d",
-    "timestamp": 1788878011.2542748,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-1245",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878011117_1a3d15",
-    "timestamp": 1788878011.1178298,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-1109",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878010988_826b68",
-    "timestamp": 1788878010.9887064,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0979",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878010865_5cb9a6",
-    "timestamp": 1788878010.8651567,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0856",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878010154_9e0016",
-    "timestamp": 1788878010.1570816,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0141",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878010005_362894",
-    "timestamp": 1788878010.0056317,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9996",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878009868_9c865d",
-    "timestamp": 1788878009.868671,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9860",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878009727_c403e9",
-    "timestamp": 1788878009.727463,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9717",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878009581_c0d623",
-    "timestamp": 1788878009.5813575,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9573",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878009372_ead77d",
-    "timestamp": 1788878009.372929,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9364",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878008821_c24b69",
-    "timestamp": 1788878008.8218226,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-8812",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878008476_e38806",
-    "timestamp": 1788878008.4761498,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-8466",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878007664_cea212",
-    "timestamp": 1788878007.6648586,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-7657",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878006843_99bfb6",
-    "timestamp": 1788878006.8437765,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-6834",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878006225_aecc42",
-    "timestamp": 1788878006.2256935,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-6217",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878004710_adbcba",
-    "timestamp": 1788878004.710587,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-4702",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878003307_9532a6",
-    "timestamp": 1788878003.3072267,
-    "action": "OFFICER_ACCEPT_DIVERSION",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACCEPT_DIVERSION-3298",
-      "action": "ACCEPT_DIVERSION",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788878000666_b159d1",
-    "timestamp": 1788878000.6660397,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0657",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788877999507_164763",
-    "timestamp": 1788877999.5076783,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-9497",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788877976133_4c6e32",
-    "timestamp": 1788877976.1333668,
-    "action": "OFFICER_NOTIFY_UNIT",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-NOTIFY_UNIT-6124",
-      "action": "NOTIFY_UNIT",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788877973033_7236a3",
-    "timestamp": 1788877973.033386,
-    "action": "OFFICER_ACCEPT_DIVERSION",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACCEPT_DIVERSION-3025",
-      "action": "ACCEPT_DIVERSION",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788877970864_cf291d",
-    "timestamp": 1788877970.8657253,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-0854",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for Five Roads Junction",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788877684967_3496bf",
-    "timestamp": 1788877684.9679923,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_042",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-7250",
-      "action": "ACKNOWLEDGE",
-      "notes": "Action 'ACKNOWLEDGE' dispatched from Police Officer Mobile App.",
-      "diversion_plan_id": null
-    }
-  },
-  {
-    "entry_id": "AUD_1788877597260_5f431d",
-    "timestamp": 1788877597.2608995,
-    "action": "OFFICER_ACKNOWLEDGE",
-    "actor": "OFFICER_TN_HQ",
-    "junction": "Sankagiri Junction",
-    "approach": "North Approach (NH544)",
-    "details": {
-      "alert_id": "ALT-ACKNOWLEDGE-7250",
-      "action": "ACKNOWLEDGE",
-      "notes": "Officer dispatch for ALERT",
-      "diversion_plan_id": null
     }
   }
 ]

@@ -8,6 +8,7 @@ import LocationOverviewBanner from "../components/LocationOverviewBanner";
 import JunctionDetailPanel from "../components/JunctionDetailPanel";
 import MonitoredJunctionsTable from "../components/MonitoredJunctionsTable";
 import { trafficService } from "../services/trafficService";
+import { useSettings } from "../context/SettingsContext";
 
 export default function Dashboard({
   health,
@@ -45,6 +46,7 @@ export default function Dashboard({
   onDismissOverview,
   onNavigateTab = null,
 }) {
+  const { t, tJunction } = useSettings();
   const [contextTab, setContextTab] = useState("attention"); // "attention" | "junction" | "cctv"
   const [isOverviewDismissed, setIsOverviewDismissed] = useState(false);
   const [currentLiveTelemetry, setCurrentLiveTelemetry] = useState(telemetry);
@@ -221,9 +223,9 @@ export default function Dashboard({
               <button
                 className={`context-tab-button ${contextTab === "attention" ? "active" : ""}`}
                 onClick={() => setContextTab("attention")}
-                title="View urgent traffic incidents and queued recommendations"
+                title={t("tabs.attentionTooltip", "View urgent traffic incidents and queued recommendations")}
               >
-                <span>ATTENTION</span>
+                <span>{t("tabs.attention", "ATTENTION")}</span>
                 {activeAlertCount > 0 && (
                   <span className="context-tab-badge">{activeAlertCount}</span>
                 )}
@@ -233,17 +235,17 @@ export default function Dashboard({
                 className={`context-tab-button ${contextTab === "junction" ? "active" : ""}`}
                 onClick={() => setContextTab("junction")}
                 disabled={!selectedJunction}
-                title={selectedJunction ? `View intelligence for ${selectedJunction.name}` : "Select a junction to view details"}
+                title={selectedJunction ? t("tabs.junctionTooltip", `View intelligence for ${tJunction ? tJunction(selectedJunction.name) : selectedJunction.name}`, { name: tJunction ? tJunction(selectedJunction.name) : selectedJunction.name }) : t("tabs.selectJunctionTooltip", "Select a junction to view details")}
               >
-                <span>JUNCTION</span>
+                <span>{t("tabs.junction", "JUNCTION")}</span>
               </button>
 
               <button
                 className={`context-tab-button ${contextTab === "cctv" ? "active" : ""}`}
                 onClick={() => setContextTab("cctv")}
-                title="Live CCTV camera stream and AI vehicle tracking"
+                title={t("tabs.cctvTooltip", "Live CCTV camera stream and AI vehicle tracking")}
               >
-                <span>CCTV</span>
+                <span>{t("tabs.cctv", "CCTV")}</span>
                 {cameraStatus === "online" && (
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--status-online, #22C55E)" }} />
                 )}
@@ -298,7 +300,7 @@ export default function Dashboard({
 
               {contextTab === "junction" && !selectedJunction && (
                 <div style={{ padding: "2.5rem 1rem", textAlign: "center", color: "var(--text-muted, #737987)", fontSize: "0.8125rem" }}>
-                  Select a junction from the map or table to view intelligence and control options.
+                  {t("tabs.selectJunctionPrompt", "Select a junction from the map or table to view intelligence and control options.")}
                 </div>
               )}
 
@@ -366,7 +368,13 @@ export default function Dashboard({
                 textTransform: "uppercase",
               }}
             >
-              {toastEvent.title || "HEAVY INFLOW"}
+              {toastEvent.title?.includes("SEVERE")
+                ? t("alerts.severeCongestion", "SEVERE CONGESTION")
+                : toastEvent.title?.includes("CRITICAL")
+                ? t("alerts.criticalAlert", "CRITICAL ALERT")
+                : toastEvent.title?.includes("ATTENTION")
+                ? t("alerts.attentionRequired", "ATTENTION REQUIRED")
+                : t("alerts.heavyInflow", toastEvent.title || "HEAVY INFLOW")}
             </span>
             <button
               onClick={() => setToastEvent(null)}
@@ -379,7 +387,7 @@ export default function Dashboard({
                 display: "flex",
                 alignItems: "center",
               }}
-              title="Dismiss notification"
+              title={t("toast.dismiss", "Dismiss notification")}
             >
               <X size={14} />
             </button>
@@ -387,26 +395,42 @@ export default function Dashboard({
 
           {toastEvent.location && (
             <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>
-              {toastEvent.location}
+              {tJunction ? tJunction(toastEvent.location) : toastEvent.location}
             </div>
           )}
 
           <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #A7ACB8)", fontWeight: 500, lineHeight: 1.35 }}>
             {toastEvent.text?.toLowerCase().includes("diversion rejected")
-              ? "Diversion rejected · Standard signal timing retained"
+              ? t("alerts.diversionRejectedDesc", "Diversion rejected · Standard signal timing retained")
               : toastEvent.text?.toLowerCase().includes("diversion accepted") || toastEvent.text?.toLowerCase().includes("diversion active")
-              ? "Diversion active · Alternate route deployed"
+              ? t("alerts.diversionActiveDesc", "Diversion active · Alternate route deployed")
               : toastEvent.text?.toLowerCase().includes("normalized")
-              ? "Traffic normalized · Corridors nominal"
-              : toastEvent.text}
+              ? t("alerts.trafficNormalizedDesc", "Traffic normalized · Corridors nominal")
+              : toastEvent.text?.includes("Junction Road")
+              ? t("toast.queueJunctionRoad", "Traffic queue extending toward Junction Road.")
+              : toastEvent.text?.includes("primary corridor approach")
+              ? t("toast.queueCorridor", "Traffic queue extending toward primary corridor approach.")
+              : (tJunction ? tJunction(toastEvent.text) : toastEvent.text)}
           </div>
 
           <div style={{ fontSize: "0.75rem", color: "var(--text-secondary, #C5CBD6)", marginTop: "4px", display: "flex", justifyContent: "space-between", alignItems: "center", fontWeight: 700 }}>
             <span style={{ color: "var(--text-primary, #FFFFFF)", fontWeight: 800 }}>
-              {toastEvent.condition || "Very Slow"}
+              {toastEvent.condition === "Standstill"
+                ? t("alerts.standstill", "Standstill")
+                : toastEvent.condition === "Very Slow"
+                ? t("alerts.verySlow", "Very Slow")
+                : toastEvent.condition === "Congested"
+                ? t("status.congested", "Congested")
+                : toastEvent.condition}
             </span>
             <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, fontSize: "0.6875rem" }}>
-              {toastEvent.time || "8 min ago"}
+              {toastEvent.time === "Active"
+                ? t("common.activeNow", "Active")
+                : toastEvent.time === "Just now"
+                ? t("common.justNow", "Just now")
+                : toastEvent.time?.includes("ago")
+                ? toastEvent.time.replace("min ago", `${t("common.min", "min")} ${t("common.ago", "ago")}`)
+                : toastEvent.time}
             </span>
           </div>
         </div>

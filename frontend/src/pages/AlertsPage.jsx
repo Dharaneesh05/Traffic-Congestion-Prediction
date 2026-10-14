@@ -144,13 +144,48 @@ function formatIncidentTime(ts) {
 }
 
 /**
+ * Localized severity to operational level
+ */
+function getLocalizedSeverity(sev, t) {
+  const s = String(sev || "WARNING").toUpperCase();
+  if (s.includes("CRIT") || s.includes("SEVER")) return (t ? t("status.critical", "CRITICAL") : "CRITICAL").toUpperCase();
+  if (s.includes("HIGH") || s.includes("HEAVY")) return (t ? t("status.high", "HIGH") : "HIGH").toUpperCase();
+  if (s.includes("RESOLV") || s.includes("CLEAR")) return (t ? t("status.resolved", "RESOLVED") : "RESOLVED").toUpperCase();
+  return (t ? t("alerts.filterWarning", "WARNING") : "WARNING").toUpperCase();
+}
+
+/**
+ * Localized operational status
+ */
+function getLocalizedStatus(status, t) {
+  const opStatus = getOperationalStatus(status);
+  if (!t) return opStatus;
+  switch (opStatus) {
+    case "NEW":
+      return t("alerts.new", "NEW");
+    case "ACKNOWLEDGED":
+      return t("alerts.acknowledged", "ACKNOWLEDGED");
+    case "ACTION ACCEPTED":
+      return t("alerts.actionAccepted", "ACTION ACCEPTED");
+    case "ACTION REJECTED":
+      return t("alerts.actionRejected", "ACTION REJECTED");
+    case "MANUAL CONTROL ACTIVE":
+      return t("alerts.manualControlActive", "MANUAL CONTROL ACTIVE");
+    case "RESOLVED":
+      return t("alerts.resolved", "RESOLVED");
+    default:
+      return opStatus;
+  }
+}
+
+/**
  * Concise real traffic condition description
  */
-function getConditionText(alertItem, status) {
-  if (status === "ACTION ACCEPTED") return "Diversion accepted · Alternate route active";
-  if (status === "ACTION REJECTED") return "Diversion not activated";
-  if (status === "MANUAL CONTROL ACTIVE" || status === "ACTION OVERRIDDEN") return "Manual control active";
-  if (status === "RESOLVED") return "Traffic flow normalized";
+function getConditionText(alertItem, status, t) {
+  if (status === "ACTION ACCEPTED") return t ? t("alerts.diversionActiveDesc", "Diversion active · Alternate route deployed") : "Diversion accepted · Alternate route active";
+  if (status === "ACTION REJECTED") return t ? t("alerts.diversionNotActivated", "Diversion not activated") : "Diversion not activated";
+  if (status === "MANUAL CONTROL ACTIVE" || status === "ACTION OVERRIDDEN") return t ? t("alerts.manualControlActive", "Manual control active") : "Manual control active";
+  if (status === "RESOLVED") return t ? t("alerts.trafficFlowNormalized", "Traffic flow normalized") : "Traffic flow normalized";
 
   // Check evidence array if provided by backend telemetry
   if (Array.isArray(alertItem.evidence) && alertItem.evidence.length > 0) {
@@ -160,13 +195,15 @@ function getConditionText(alertItem, status) {
       const vNum = (vMatch.match(/\d+/) || [""])[0];
       const sNum = (sMatch.match(/\d+(\.\d+)?/) || [""])[0];
       if (vNum && sNum) {
-        return `${vNum} vehicles · Average speed ${sNum} km/h`;
+        return t
+          ? t("alerts.vehiclesCountAndSpeed", "{vehicles} vehicles · Average speed {speed} km/h", { vehicles: vNum, speed: sNum })
+          : `${vNum} vehicles · Average speed ${sNum} km/h`;
       }
     }
   }
 
   let raw = (alertItem.reason || alertItem.message || "").trim();
-  if (!raw) return "Data unavailable";
+  if (!raw) return t ? t("alerts.dataUnavailable", "Data unavailable") : "Data unavailable";
 
   // Strip technical / AI buzzwords
   let cleaned = raw
@@ -181,19 +218,37 @@ function getConditionText(alertItem, status) {
     .trim();
 
   // Format concise operational metrics
+  const vOccMatch = cleaned.match(/(\d+)\s+active vehicles\.\s*Road occupancy\s*(\d+)%/i)
+    || cleaned.match(/(\d+)\s+vehicles detected\s*·\s*Road occupancy\s*(\d+)%/i)
+    || cleaned.match(/(\d+)\s+vehicles detected\s*\((\d+)%\s*occupancy\)/i);
+  if (vOccMatch && t) {
+    return t("alerts.vehiclesCountAndOccupancy", "{vehicles} vehicles · Road occupancy {occupancy}%", {
+      vehicles: vOccMatch[1],
+      occupancy: vOccMatch[2],
+    });
+  }
+
+  const queueMatch = cleaned.match(/Traffic density exceeded\s*(\d+)%\s*capacity\.\s*Queue extending\s*(\d+m)/i);
+  if (queueMatch && t) {
+    return t("alerts.occupancyAndQueue", "Road occupancy {occupancy}% · Queue extending {queue}", {
+      occupancy: queueMatch[1],
+      queue: queueMatch[2],
+    });
+  }
+
   cleaned = cleaned.replace(/(\d+)\s+active vehicles\.\s*Road occupancy\s*(\d+)%/i, "$1 vehicles · Road occupancy $2%");
   cleaned = cleaned.replace(/(\d+)\s+vehicles detected\s*·\s*Road occupancy\s*(\d+)%/i, "$1 vehicles · Road occupancy $2%");
   cleaned = cleaned.replace(/(\d+)\s+vehicles detected\s*\((\d+)%\s*occupancy\)/i, "$1 vehicles · Road occupancy $2%");
   cleaned = cleaned.replace(/Traffic density exceeded\s*(\d+)%\s*capacity\.\s*Queue extending\s*(\d+m)/i, "Road occupancy $1% · Queue extending $2");
 
-  if (!cleaned) return "Traffic queue increasing";
+  if (!cleaned) return t ? t("alerts.trafficQueueIncreasing", "Traffic queue increasing") : "Traffic queue increasing";
   return cleaned;
 }
 
 /**
  * Concise operational required action
  */
-function getRequiredActionText(alertItem, status) {
+function getRequiredActionText(alertItem, status, t) {
   if (
     status === "RESOLVED" ||
     status === "ACTION ACCEPTED" ||
@@ -205,25 +260,22 @@ function getRequiredActionText(alertItem, status) {
 
   const act = (alertItem.action || "").trim();
   if (act) {
-    let cleaned = act
-      .replace(/Advisory:?/gi, "")
-      .replace(/Action:?/gi, "")
-      .replace(/Divert vehicles via [^\.]*\.?/gi, "Review diversion route")
-      .replace(/Activate flyover diversion protocol\.?/gi, "Review diversion route")
-      .replace(/Diversion recommended\.?/gi, "Review diversion route")
-      .replace(/Deploy field interceptor and trigger signal extension\.?/gi, "Dispatch field unit · Adjust signal")
-      .trim();
-    if (cleaned) return cleaned;
+    if (/Deploy field interceptor and trigger signal extension/i.test(act)) {
+      return t ? t("alerts.dispatchFieldUnitAdjustSignal", "Dispatch field unit · Adjust signal") : "Dispatch field unit · Adjust signal";
+    }
+    if (/Divert vehicles|Activate flyover|Diversion recommended/i.test(act)) {
+      return t ? t("alerts.reviewDiversionRoute", "Review diversion route") : "Review diversion route";
+    }
   }
 
   if (alertItem.hasDiversion || alertItem.diversion_plan_id) {
-    return "Review diversion route";
+    return t ? t("alerts.reviewDiversionRoute", "Review diversion route") : "Review diversion route";
   }
 
   const sev = getOperationalSeverity(alertItem.severity);
-  if (sev === "CRITICAL") return "Dispatch field unit";
-  if (sev === "HIGH") return "Monitor traffic conditions";
-  return "Monitor traffic flow";
+  if (sev === "CRITICAL") return t ? t("alerts.dispatchFieldUnit", "Dispatch field unit") : "Dispatch field unit";
+  if (sev === "HIGH") return t ? t("alerts.monitorTrafficConditions", "Monitor traffic conditions") : "Monitor traffic conditions";
+  return t ? t("alerts.monitorTrafficFlow", "Monitor traffic flow") : "Monitor traffic flow";
 }
 
 export default function AlertsPage({
@@ -233,7 +285,7 @@ export default function AlertsPage({
   onOfficerAction,
   onNavigateTab,
 }) {
-  const { settings, t } = useSettings();
+  const { settings, t, tJunction } = useSettings();
   const [filter, setFilter] = useState("ALL"); // ALL | CRITICAL | HIGH | WARNING
   const [localAlerts, setLocalAlerts] = useState(alerts);
   const [latestNotification, setLatestNotification] = useState(null);
@@ -270,32 +322,33 @@ export default function AlertsPage({
   // Officer Action Handler
   const handleAction = async (alertItem, actionType) => {
     const alertId = alertItem.alert_id || alertItem.id;
-    const locName = getCleanLocation(alertItem);
+    const rawLocName = getCleanLocation(alertItem);
+    const locName = tJunction ? tJunction(rawLocName) : rawLocName;
     const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
 
     let newStatus = "ACKNOWLEDGED";
-    let actionUpdateText = "Acknowledged";
+    let actionUpdateText = t ? t("alerts.acknowledgedTitle", "Acknowledged") : "Acknowledged";
     let newCondition = alertItem.reason;
 
     if (actionType === "APPROVE" || actionType === "ACCEPT" || actionType === "ACCEPT_DIVERSION") {
       newStatus = "ACTION ACCEPTED";
-      actionUpdateText = "Diversion accepted · Alternate route active";
+      actionUpdateText = t ? t("alerts.diversionActiveDesc", "Diversion active · Alternate route deployed") : "Diversion accepted · Alternate route active";
       newCondition = "Diversion accepted · Alternate route active";
     } else if (actionType === "REJECT" || actionType === "REJECT_DIVERSION") {
       newStatus = "ACTION REJECTED";
-      actionUpdateText = "Diversion rejected";
+      actionUpdateText = t ? t("alerts.actionRejected", "Diversion rejected") : "Diversion rejected";
       newCondition = "Diversion not activated";
     } else if (actionType === "OVERRIDE" || actionType === "MANUAL_CONTROL") {
       newStatus = "MANUAL CONTROL ACTIVE";
-      actionUpdateText = "Manual control recorded";
+      actionUpdateText = t ? t("alerts.manualControlRecorded", "Manual control recorded") : "Manual control recorded";
       newCondition = "Manual control recorded";
     } else if (actionType === "RESOLVE") {
       newStatus = "RESOLVED";
-      actionUpdateText = "Resolved · Traffic normalized";
+      actionUpdateText = t ? t("alerts.trafficNormalizedDesc", "Resolved · Traffic normalized") : "Resolved · Traffic normalized";
       newCondition = "Traffic flow normalized";
     } else if (actionType === "ACKNOWLEDGE") {
       newStatus = "ACKNOWLEDGED";
-      actionUpdateText = "Acknowledged";
+      actionUpdateText = t ? t("alerts.acknowledgedTitle", "Acknowledged") : "Acknowledged";
     }
 
     // Zero-latency state update
@@ -353,7 +406,7 @@ export default function AlertsPage({
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
             <span style={{ fontWeight: 800, color: "var(--accent-soft-blue, #7B8BC8)", letterSpacing: "0.05em" }}>
-              ACTION UPDATE
+              {t("alerts.actionUpdate", "ACTION UPDATE")}
             </span>
             <span style={{ color: "var(--text-primary, #F4F5F7)" }}>{latestNotification.message}</span>
           </div>
@@ -379,17 +432,22 @@ export default function AlertsPage({
       >
         <div>
           <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", margin: 0, letterSpacing: "-0.01em" }}>
-            TRAFFIC INCIDENTS
+            {t("alerts.title", "TRAFFIC INCIDENTS")}
           </h1>
           <p style={{ fontSize: "0.75rem", color: "var(--text-muted, #737987)", margin: "0.2rem 0 0 0", fontWeight: 500 }}>
-            Active incidents, traffic alerts and officer actions
+            {t("alerts.subtitle", "Active incidents, traffic alerts and officer actions")}
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           {/* Functional Filters: ALL | CRITICAL | HIGH | WARNING */}
           <div style={{ display: "flex", gap: "0.3rem" }}>
-            {["ALL", "CRITICAL", "HIGH", "WARNING"].map((f) => {
+            {[
+              { id: "ALL", label: t("alerts.filterAll", "ALL") },
+              { id: "CRITICAL", label: t("alerts.filterCritical", "CRITICAL") },
+              { id: "HIGH", label: t("alerts.filterHigh", "HIGH") },
+              { id: "WARNING", label: t("alerts.filterWarning", "WARNING") },
+            ].map(({ id: f, label }) => {
               const isSelected = filter === f;
               return (
                 <button
@@ -409,7 +467,7 @@ export default function AlertsPage({
                     transition: "all 0.15s ease",
                   }}
                 >
-                  {f}
+                  {label}
                 </button>
               );
             })}
@@ -428,7 +486,7 @@ export default function AlertsPage({
               border: `1px solid ${activeCount > 0 ? "rgba(244, 94, 112, 0.3)" : "var(--border-default, #3D3F4E)"}`,
             }}
           >
-            {activeCount} ACTIVE
+            {activeCount} {t("alerts.active", "ACTIVE")}
           </span>
         </div>
       </div>
@@ -444,16 +502,19 @@ export default function AlertsPage({
       >
         {filteredAlerts.length === 0 ? (
           <div style={{ padding: "2.5rem 1.5rem", textAlign: "center", color: "var(--text-muted, #737987)", fontSize: "0.8125rem" }}>
-            No incidents found for the selected filter.
+            {t("alerts.noIncidentsFound", "No incidents found for the selected filter.")}
           </div>
         ) : (
           filteredAlerts.map((item, idx) => {
             const sev = getOperationalSeverity(item.severity);
             const status = getOperationalStatus(item.status);
+            const localizedSev = getLocalizedSeverity(sev, t);
+            const localizedStatus = getLocalizedStatus(status, t);
             const sevColor = SEVERITY_COLORS[sev] || SEVERITY_COLORS.WARNING;
-            const location = getCleanLocation(item);
-            const condition = getConditionText(item, status);
-            const requiredAction = getRequiredActionText(item, status);
+            const rawLocation = getCleanLocation(item);
+            const location = tJunction ? tJunction(rawLocation) : rawLocation;
+            const condition = getConditionText(item, status, t);
+            const requiredAction = getRequiredActionText(item, status, t);
             const timeStr = formatIncidentTime(item.timestamp);
 
             const hasRecommendation = Boolean(
@@ -482,13 +543,13 @@ export default function AlertsPage({
               >
                 {/* 1. SEVERITY · TIME · STATUS */}
                 <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.75rem", letterSpacing: "0.04em", fontWeight: 700 }}>
-                  <span style={{ color: sevColor }}>{sev}</span>
+                  <span style={{ color: sevColor }}>{localizedSev}</span>
                   <span style={{ color: "var(--border-strong, #4A4E5D)" }}>·</span>
                   <span style={{ color: "var(--text-muted, #737987)", fontFamily: "var(--font-mono, monospace)", fontWeight: 600 }}>
                     {timeStr.toUpperCase()}
                   </span>
                   <span style={{ color: "var(--border-strong, #4A4E5D)" }}>·</span>
-                  <span style={{ color: statusColor }}>{status}</span>
+                  <span style={{ color: statusColor }}>{localizedStatus}</span>
                 </div>
 
                 {/* 2. LOCATION */}
@@ -531,7 +592,7 @@ export default function AlertsPage({
                     }}
                   >
                     <MapPin size={11} />
-                    VIEW MAP
+                    {t("actions.viewMap", "VIEW MAP")}
                   </button>
 
                   {/* State: NEW -> ACKNOWLEDGE and APPROVE/REJECT/MANUAL CONTROL if recommendation exists */}
@@ -553,7 +614,7 @@ export default function AlertsPage({
                           transition: "all 0.15s ease",
                         }}
                       >
-                        ACKNOWLEDGE
+                        {t("actions.acknowledge", "ACKNOWLEDGE")}
                       </button>
 
                       {hasRecommendation && (
@@ -574,7 +635,7 @@ export default function AlertsPage({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            APPROVE
+                            {t("actions.approve", "APPROVE")}
                           </button>
                           <button
                             type="button"
@@ -592,7 +653,7 @@ export default function AlertsPage({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            REJECT
+                            {t("actions.reject", "REJECT")}
                           </button>
                           <button
                             type="button"
@@ -610,7 +671,7 @@ export default function AlertsPage({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            MANUAL CONTROL
+                            {t("actions.manualControl", "MANUAL CONTROL")}
                           </button>
                         </>
                       )}
@@ -638,7 +699,7 @@ export default function AlertsPage({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            APPROVE
+                            {t("actions.approve", "APPROVE")}
                           </button>
                           <button
                             type="button"
@@ -656,7 +717,7 @@ export default function AlertsPage({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            REJECT
+                            {t("actions.reject", "REJECT")}
                           </button>
                           <button
                             type="button"
@@ -674,7 +735,7 @@ export default function AlertsPage({
                               transition: "all 0.15s ease",
                             }}
                           >
-                            MANUAL CONTROL
+                            {t("actions.manualControl", "MANUAL CONTROL")}
                           </button>
                         </>
                       )}
@@ -695,7 +756,7 @@ export default function AlertsPage({
                           transition: "all 0.15s ease",
                         }}
                       >
-                        RESOLVE
+                        {t("actions.resolve", "RESOLVE")}
                       </button>
                     </>
                   )}
@@ -718,7 +779,7 @@ export default function AlertsPage({
                         transition: "all 0.15s ease",
                       }}
                     >
-                      RESOLVE
+                      {t("actions.resolve", "RESOLVE")}
                     </button>
                   )}
                 </div>
@@ -738,40 +799,40 @@ export default function AlertsPage({
         }}
       >
         <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-muted, #737987)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.625rem" }}>
-          RESPONSE GUIDANCE
+          {t("alerts.responseGuidance", "RESPONSE GUIDANCE")}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.75rem", fontSize: "0.75rem" }}>
           <div style={{ borderLeft: "3px solid var(--status-critical, #F45E70)", paddingLeft: "0.625rem" }}>
             <span style={{ fontWeight: 800, color: "var(--status-critical, #F45E70)", display: "block", marginBottom: "0.15rem" }}>
-              CRITICAL
+              {t("status.critical", "CRITICAL").toUpperCase()}
             </span>
             <p style={{ color: "var(--text-secondary, #A7ACB8)", margin: 0, lineHeight: 1.45 }}>
-              Immediate officer attention required. Review the recommended action and route conditions.
+              {t("alerts.guidanceCritical", "Immediate officer attention required. Review the recommended action and route conditions.")}
             </p>
           </div>
 
           <div style={{ borderLeft: "3px solid var(--status-high, #F59E0B)", paddingLeft: "0.625rem" }}>
             <span style={{ fontWeight: 800, color: "var(--status-high, #F59E0B)", display: "block", marginBottom: "0.15rem" }}>
-              HIGH
+              {t("status.high", "HIGH").toUpperCase()}
             </span>
             <p style={{ color: "var(--text-secondary, #A7ACB8)", margin: 0, lineHeight: 1.45 }}>
-              Monitor the location and review the recommended action.
+              {t("alerts.guidanceHigh", "Monitor the location and review the recommended action.")}
             </p>
           </div>
 
           <div style={{ borderLeft: "3px solid var(--status-moderate, #C2BB91)", paddingLeft: "0.625rem" }}>
             <span style={{ fontWeight: 800, color: "var(--status-moderate, #C2BB91)", display: "block", marginBottom: "0.15rem" }}>
-              WARNING
+              {t("alerts.filterWarning", "WARNING")}
             </span>
             <p style={{ color: "var(--text-secondary, #A7ACB8)", margin: 0, lineHeight: 1.45 }}>
-              Continue monitoring traffic conditions.
+              {t("alerts.guidanceWarning", "Continue monitoring traffic conditions.")}
             </p>
           </div>
         </div>
 
         <div style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)", fontStyle: "italic", borderTop: "1px solid var(--border-light, #2C303C)", paddingTop: "0.5rem", marginTop: "0.625rem" }}>
-          Decision support guidance only. Officer remains responsible for the final operational decision.
+          {t("alerts.guidanceDisclaimer", "Decision support guidance only. Officer remains responsible for the final operational decision.")}
         </div>
       </div>
     </div>

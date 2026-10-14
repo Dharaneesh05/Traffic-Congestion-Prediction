@@ -15,10 +15,16 @@ import sys
 import time
 from typing import Dict, Optional, Any
 
+from dotenv import load_dotenv
+
 # Ensure backend directory is in sys.path
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
+
+# Load environment variables
+load_dotenv(os.path.join(_BACKEND_DIR, "..", ".env"))
+load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
@@ -42,7 +48,13 @@ class RedisClient:
         try:
             import redis
             print(f"[Redis] Connecting to Redis at: {self.redis_url}")
-            r = redis.Redis.from_url(self.redis_url, socket_timeout=1.5, socket_connect_timeout=1.5, decode_responses=True)
+            r = redis.Redis.from_url(
+                self.redis_url,
+                socket_timeout=1.5,
+                socket_connect_timeout=1.5,
+                decode_responses=True,
+                protocol=2
+            )
             r.ping()
             self.redis = r
             self.is_connected = True

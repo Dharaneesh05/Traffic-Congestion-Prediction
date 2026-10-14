@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Loader2, Upload, ChevronDown } from "lucide-react";
 import {
   getStreamUrl,
@@ -10,6 +10,17 @@ import {
 } from "../api";
 import { trafficService } from "../services/trafficService";
 import { useSettings } from "../context/SettingsContext";
+
+const DEFAULT_VIDEOS = [
+  "Traffic.mp4",
+  "Traffic2.mp4",
+  "Traffic3.mp4",
+  "Traffic4.mp4",
+  "video.mp4",
+  "video1.mp4",
+  "video2.mp4",
+  "video3.mp4",
+];
 
 export default function CCTVCamerasPage({
   telemetry,
@@ -33,7 +44,7 @@ export default function CCTVCamerasPage({
   const [sourceMode, setSourceMode] = useState("video"); // "video" | "ip"
   const [selectedVideo, setSelectedVideo] = useState("Traffic.mp4");
   const currentSelectedVideoName = typeof selectedVideo === "string" ? selectedVideo : (selectedVideo?.filename || "Traffic.mp4");
-  const [videoList, setVideoList] = useState([]);
+  const [videoList, setVideoList] = useState(DEFAULT_VIDEOS);
   const [rtspUrl, setRtspUrl] = useState("rtsp://10.161.12.181:1945/");
   const [urlError, setUrlError] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -42,11 +53,19 @@ export default function CCTVCamerasPage({
   const [streamNonce, setStreamNonce] = useState(Date.now());
   const [liveTelemetry, setLiveTelemetry] = useState(telemetry);
   const [analysisActive, setAnalysisActive] = useState(false);
+  const [isRtspConnected, setIsRtspConnected] = useState(false);
   const [lastUpdatedTime, setLastUpdatedTime] = useState("Just now");
   const [isInfoExpanded, setIsInfoExpanded] = useState(false);
   const [incidentHovered, setIncidentHovered] = useState(false);
 
+  // Guard refs to lock video selection and prevent telemetry-induced restart loops
+  const hasInitializedRef = useRef(false);
+  const prevJunctionIdRef = useRef(selectedJunction?.id);
+  const prevCamIdRef = useRef(activeCameraId || "CCTV-TPR-01");
+  const userSelectedVideoRef = useRef(null);
+
   const isOnline = cameraStatus === "online";
+  const isFeedActive = sourceMode === "video" ? isOnline : (isOnline && isRtspConnected);
 
   // Sync active camera ID when changed from global top search bar
   useEffect(() => {
@@ -172,35 +191,56 @@ export default function CCTVCamerasPage({
   // Load sample videos and AUTO-START live feed stream immediately as per location
   useEffect(() => {
     let active = true;
+    if (sourceMode !== "video") return;
+
+    const currentJunctionId = currentJunction?.id;
+    const junctionChanged = prevJunctionIdRef.current !== currentJunctionId;
+    const cameraChanged = prevCamIdRef.current !== activeCamId;
+
+    if (hasInitializedRef.current && !junctionChanged && !cameraChanged) {
+      return;
+    }
+
+    prevJunctionIdRef.current = currentJunctionId;
+    prevCamIdRef.current = activeCamId;
+
     const initCameraFeed = async () => {
-      let chosenVideo = "Traffic.mp4";
+      let chosenVideo = userSelectedVideoRef.current || selectedVideo || "Traffic.mp4";
       try {
         const res = await getVideosList();
         if (res?.videos && res.videos.length > 0) {
           if (active) setVideoList(res.videos);
           const list = res.videos.map((v) => (typeof v === "string" ? v : v.filename));
-          const locStr = typeof selectedLocation === "string" ? selectedLocation : (selectedLocation?.name || "");
-          const jName = (currentJunction?.name || locStr || "").toLowerCase();
-          const cId = (activeCamId || "").toLowerCase();
-          const matched = list.find((v) => {
-            const vl = v.toLowerCase();
-            return (jName && vl.includes(jName)) || (cId && vl.includes(cId));
-          });
-          if (matched) {
-            chosenVideo = matched;
+          if (!userSelectedVideoRef.current) {
+            const locStr = typeof selectedLocation === "string" ? selectedLocation : (selectedLocation?.name || "");
+            const jName = (currentJunction?.name || locStr || "").toLowerCase();
+            const cId = (activeCamId || "").toLowerCase();
+            const matched = list.find((v) => {
+              const vl = v.toLowerCase();
+              return (jName && vl.includes(jName)) || (cId && vl.includes(cId));
+            });
+            if (matched) {
+              chosenVideo = matched;
+            } else {
+              const num = activeCamId.match(/\d+/);
+              const idx = num ? parseInt(num[0], 10) - 1 : 0;
+              chosenVideo = list[Math.abs(idx) % list.length] || "Traffic.mp4";
+            }
           } else {
-            const num = activeCamId.match(/\d+/);
-            const idx = num ? parseInt(num[0], 10) - 1 : 0;
-            chosenVideo = list[Math.abs(idx) % list.length] || "Traffic.mp4";
+            chosenVideo = userSelectedVideoRef.current;
           }
           if (active) setSelectedVideo(chosenVideo);
         }
       } catch (e) {}
 
-      // Auto start camera if not already streaming
-      if (onStartCamera && !isOnline) {
+      // Auto start camera if in video mode
+      if (onStartCamera && sourceMode === "video") {
         try {
           await onStartCamera(activeCamId, { video: chosenVideo, auto_analysis: true });
+          if (active) {
+            hasInitializedRef.current = true;
+            setAnalysisActive(true);
+          }
         } catch (err) {
           console.error("Auto start camera failed:", err);
         }
@@ -211,7 +251,7 @@ export default function CCTVCamerasPage({
     return () => {
       active = false;
     };
-  }, [activeCamId, currentJunction, selectedLocation]);
+  }, [activeCamId, currentJunction?.id, sourceMode]);
 
   // Video File Upload Handler
   const handleFileUpload = async (e) => {
@@ -225,6 +265,7 @@ export default function CCTVCamerasPage({
     try {
       const res = await uploadVideoFile(formData);
       if (res?.camera_id) {
+        userSelectedVideoRef.current = file.name;
         setSelectedVideo(file.name);
         setActiveCamId(res.camera_id);
         if (onSelectCamera) onSelectCamera(res.camera_id);
@@ -234,7 +275,8 @@ export default function CCTVCamerasPage({
           setStreamError(false);
           setRetryCount(0);
           setStreamNonce(Date.now());
-          onStartCamera(res.camera_id, { video: file.name, auto_analysis: true });
+          await onStartCamera(res.camera_id, { video: file.name, auto_analysis: true });
+          setAnalysisActive(true);
         }
       }
     } catch (err) {
@@ -244,49 +286,109 @@ export default function CCTVCamerasPage({
     }
   };
 
-  const handleVideoChange = (newVideo) => {
+  const handleVideoChange = async (newVideo) => {
     const fname = typeof newVideo === "string" ? newVideo : (newVideo?.filename || "Traffic.mp4");
+    userSelectedVideoRef.current = fname;
     setSelectedVideo(fname);
+    setLiveTelemetry(null);
+    setStreamError(false);
+    setRetryCount(0);
     if (onStartCamera) {
-      setStreamError(false);
-      setRetryCount(0);
-      setStreamNonce(Date.now());
-      onStartCamera(activeCamId, { video: fname, auto_analysis: true });
+      try {
+        await onStartCamera(activeCamId, { video: fname, auto_analysis: true });
+        setStreamNonce(Date.now());
+        setAnalysisActive(true);
+      } catch (err) {
+        console.error("Video switch failed:", err);
+      }
+    }
+  };
+
+  // Switching to IP Camera: immediately stop video, release capture, clear display and metrics
+  const handleSwitchToIp = async () => {
+    if (sourceMode === "ip") return;
+    setSourceMode("ip");
+    setIsRtspConnected(false);
+    setUrlError("");
+    setStreamError(false);
+    setRetryCount(0);
+    setAnalysisActive(false);
+    setLiveTelemetry(null);
+    if (onStopCamera) {
+      await onStopCamera(activeCamId);
+    }
+    try {
+      await stopCameraAnalysis(activeCamId).catch(() => null);
+    } catch (e) {}
+    setActiveCamId("CCTV-IP-01");
+    if (onSelectCamera) onSelectCamera("CCTV-IP-01");
+  };
+
+  // Switching to Uploaded Video: immediately stop IP camera, clear state, auto start video
+  const handleSwitchToVideo = async () => {
+    if (sourceMode === "video") return;
+    setSourceMode("video");
+    setIsRtspConnected(false);
+    setUrlError("");
+    setStreamError(false);
+    setRetryCount(0);
+    setLiveTelemetry(null);
+    if (onStopCamera) {
+      await onStopCamera(activeCamId);
+    }
+    try {
+      await stopCameraAnalysis(activeCamId).catch(() => null);
+    } catch (e) {}
+    const targetCamId = currentJunction?.cameras?.[0]?.id || "CCTV-TPR-01";
+    setActiveCamId(targetCamId);
+    if (onSelectCamera) onSelectCamera(targetCamId);
+    if (onStartCamera) {
+      const vName = userSelectedVideoRef.current || currentSelectedVideoName || "Traffic.mp4";
+      try {
+        await onStartCamera(targetCamId, { video: vName, auto_analysis: true });
+        setStreamNonce(Date.now());
+        setAnalysisActive(true);
+      } catch (err) {
+        console.error("Video start failed:", err);
+      }
     }
   };
 
   const handleStartCamera = async () => {
+    if (isConnecting) return;
+    setUrlError("");
     setStreamError(false);
     setRetryCount(0);
-    setUrlError("");
-    setStreamNonce(Date.now());
-    setAnalysisActive(true);
 
     if (onStartCamera) {
       if (sourceMode === "video") {
+        setLiveTelemetry(null);
         try {
-          const videoName = currentSelectedVideoName;
+          const videoName = userSelectedVideoRef.current || currentSelectedVideoName;
           await onStartCamera(activeCamId, { video: videoName, auto_analysis: true });
+          setStreamNonce(Date.now());
+          setAnalysisActive(true);
         } catch (err) {
           console.error("Video camera start failed:", err);
         }
       } else if (sourceMode === "ip") {
         const trimmed = rtspUrl.trim();
-        if (!trimmed.toLowerCase().startsWith("rtsp://") && !trimmed.toLowerCase().startsWith("rtsps://")) {
-          setUrlError("Invalid RTSP URL. Must begin with rtsp://");
+        if (!trimmed.toLowerCase().startsWith("rtsp://") && !trimmed.toLowerCase().startsWith("rtsps://") && !trimmed.toLowerCase().startsWith("http://") && !trimmed.toLowerCase().startsWith("https://")) {
+          setUrlError("Invalid stream URL. Must begin with rtsp:// or http://");
           return;
         }
+        setIsRtspConnected(false);
+        setLiveTelemetry(null);
         try {
-          await onStartCamera(activeCamId, { source: trimmed, source_type: "rtsp", auto_analysis: true });
+          await onStartCamera("CCTV-IP-01", { source: trimmed, source_type: "rtsp", auto_analysis: true });
+          setActiveCamId("CCTV-IP-01");
+          setIsRtspConnected(true);
+          setStreamNonce(Date.now());
+          setAnalysisActive(true);
         } catch (err) {
           console.error("RTSP camera start failed:", err);
-          setUrlError(err?.message || "Failed to connect to RTSP camera stream.");
-        }
-      } else {
-        try {
-          await onStartCamera(activeCamId, { auto_analysis: true });
-        } catch (err) {
-          console.error("Camera start failed:", err);
+          setIsRtspConnected(false);
+          setUrlError(err?.message || "Failed to connect to RTSP camera stream. Verify mobile device is broadcasting.");
         }
       }
     }
@@ -316,17 +418,20 @@ export default function CCTVCamerasPage({
 
   // Status mapping
   const isConnecting = isLoadingCameraAction || cameraStatus === "connecting" || cameraStatus === "starting";
-  const isError = (streamError && !isConnecting) || cameraStatus === "error";
+  const isError = (streamError && !isConnecting) || (cameraStatus === "error" && sourceMode !== "ip");
 
   let statusText = t("status.live", "LIVE");
   let statusColor = "#22C55E";
   if (isConnecting) {
     statusText = t("status.connecting", "CONNECTING");
     statusColor = "#D97706";
+  } else if (sourceMode === "ip" && !isFeedActive) {
+    statusText = t("status.standby", "STANDBY");
+    statusColor = "#737987";
   } else if (isError) {
-    statusText = t("status.unavailable", "UNAVAILABLE");
+    statusText = t("status.unavailable", "CAMERA UNAVAILABLE");
     statusColor = "#EF4444";
-  } else if (!isOnline) {
+  } else if (!isFeedActive) {
     statusText = t("status.ready", "READY");
     statusColor = "#737987";
   }
@@ -410,6 +515,10 @@ export default function CCTVCamerasPage({
     return locationIncidents.find((a) => a !== activeAccident && a !== activeAmbulance);
   }, [locationIncidents, activeAccident, activeAmbulance]);
 
+  const hasIncident = locationIncidents.length > 0;
+  const hasAmbulance = Boolean(activeAmbulance);
+  const hasAccident = Boolean(activeAccident);
+
   const getAccidentHeadline = (inc) => {
     if (!inc) return "ACCIDENT DETECTED";
     const t = (inc.type || inc.incident_type || inc.title || "").toLowerCase();
@@ -450,10 +559,10 @@ export default function CCTVCamerasPage({
 
   const isAnalysisRunning = Boolean(
     analysisActive ||
-    (isOnline && (sourceMode === "video" || hasTelemetryMetrics(liveTelemetry) || hasTelemetryMetrics(telemetry)))
+    (isFeedActive && (sourceMode === "video" || hasTelemetryMetrics(liveTelemetry) || hasTelemetryMetrics(telemetry)))
   );
 
-  const effTel = isOnline && isAnalysisRunning ? (liveTelemetry || telemetry) : null;
+  const effTel = isFeedActive && isAnalysisRunning ? (liveTelemetry || telemetry) : null;
 
   const valVehicles = effTel && (effTel.total_tracked != null || effTel.vehicle_count != null || effTel.active_tracks != null || effTel.total != null)
     ? (effTel.total_tracked ?? effTel.vehicle_count ?? effTel.active_tracks ?? effTel.total)
@@ -501,7 +610,7 @@ export default function CCTVCamerasPage({
               width: "100%",
               aspectRatio: "16 / 9",
               background: "#0D0F12",
-              border: "1px solid #303746",
+              border: "1px solid var(--border-default, #D8E0E8)",
               borderRadius: "4px",
               overflow: "hidden",
               display: "flex",
@@ -510,7 +619,7 @@ export default function CCTVCamerasPage({
             }}
           >
             {/* Live stream image */}
-            {isOnline && !isError ? (
+            {isFeedActive && !isError ? (
               <>
                 <img
                   src={streamSrc}
@@ -534,8 +643,7 @@ export default function CCTVCamerasPage({
                     gap: "0.45rem",
                     padding: "0.25rem 0.6rem",
                     background: "rgba(16, 18, 22, 0.85)",
-                    backdropFilter: "blur(4px)",
-                    border: "1px solid rgba(48, 55, 70, 0.75)",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
                     borderRadius: "3px",
                   }}
                 >
@@ -544,22 +652,40 @@ export default function CCTVCamerasPage({
                       width: "7px",
                       height: "7px",
                       borderRadius: "50%",
-                      background: "#22C55E",
-                      boxShadow: "0 0 6px #22C55E",
+                      background: "var(--status-normal, #22C55E)",
                     }}
                   />
                   <span
                     style={{
                       fontSize: "0.6875rem",
                       fontWeight: 800,
-                      color: "#F4F5F7",
+                      color: "#FFFFFF",
                       letterSpacing: "0.08em",
                     }}
                   >
-                    LIVE
+                    {t("status.live", "LIVE")}
                   </span>
                 </div>
               </>
+            ) : sourceMode === "ip" && !isConnecting && !streamError ? (
+              /* Blank/standby display for IP Camera until stream connects */
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  color: "#94A3B8",
+                  padding: "1.5rem",
+                }}
+              >
+                <div style={{ fontSize: "0.875rem", fontWeight: 700, letterSpacing: "0.05em" }}>
+                  {t("cctv.ipCameraStandby", "IP CAMERA STANDBY")}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#64748B" }}>
+                  {t("cctv.enterRtspPrompt", "Enter RTSP stream URL and click Connect to start feed")}
+                </div>
+              </div>
             ) : isConnecting ? (
               <div
                 style={{
@@ -567,15 +693,17 @@ export default function CCTVCamerasPage({
                   flexDirection: "column",
                   alignItems: "center",
                   gap: "0.75rem",
-                  color: "#9299A8",
+                  color: "var(--text-muted, #64748B)",
                 }}
               >
-                <Loader2 className="animate-spin" size={32} color="#7C8FD8" />
-                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#F4F5F7" }}>
-                  Connecting to live feed...
+                <Loader2 className="animate-spin" size={32} color="var(--accent, #245B86)" />
+                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#FFFFFF" }}>
+                  {sourceMode === "ip"
+                    ? t("cctv.connectingRtsp", "Connecting to RTSP stream...")
+                    : t("cctv.connectingLiveFeed", "Connecting to live feed...")}
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "#9299A8" }}>
-                  Initializing detection pipeline
+                  {t("cctv.initDetectionPipeline", "Initializing detection pipeline")}
                 </div>
               </div>
             ) : isError ? (
@@ -585,32 +713,34 @@ export default function CCTVCamerasPage({
                   flexDirection: "column",
                   alignItems: "center",
                   gap: "0.75rem",
-                  color: "#FF5B6E",
+                  color: "var(--status-critical, #C94B59)",
                 }}
               >
                 <div style={{ fontSize: "0.9375rem", fontWeight: 700 }}>
-                  CAMERA UNAVAILABLE
+                  {t("cctv.cameraUnavailable", "CAMERA UNAVAILABLE")}
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "#9299A8" }}>
-                  Failed to connect to video feed
+                  {t("cctv.failedConnectFeed", "Failed to connect to video feed")}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleStartCamera}
-                  style={{
-                    marginTop: "0.25rem",
-                    padding: "0.35rem 0.85rem",
-                    background: "#222733",
-                    border: "1px solid #303746",
-                    borderRadius: "3px",
-                    color: "#F4F5F7",
-                    fontSize: "0.75rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Retry
-                </button>
+                {sourceMode === "video" && (
+                  <button
+                    type="button"
+                    onClick={handleStartCamera}
+                    style={{
+                      marginTop: "0.25rem",
+                      padding: "0.35rem 0.85rem",
+                      background: "var(--bg-surface-elevated, #222733)",
+                      border: "1px solid var(--border-default, #303746)",
+                      borderRadius: "3px",
+                      color: "var(--text-primary, #F4F5F7)",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {t("common.retry", "Retry")}
+                  </button>
+                )}
               </div>
             ) : (
               <div
@@ -619,12 +749,12 @@ export default function CCTVCamerasPage({
                   flexDirection: "column",
                   alignItems: "center",
                   gap: "0.75rem",
-                  color: "#9299A8",
+                  color: "var(--text-muted, #64748B)",
                 }}
               >
-                <Loader2 className="animate-spin" size={32} color="#7C8FD8" />
-                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#F4F5F7" }}>
-                  Loading live feed...
+                <Loader2 className="animate-spin" size={32} color="var(--accent, #245B86)" />
+                <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#FFFFFF" }}>
+                  {t("cctv.loadingLiveFeed", "Loading live feed...")}
                 </div>
               </div>
             )}
@@ -640,12 +770,12 @@ export default function CCTVCamerasPage({
               justifyContent: "space-between",
               alignItems: "center",
               paddingBottom: "0.5rem",
-              borderBottom: "1px solid #303746",
+              borderBottom: "1px solid var(--border-default, #D8E0E8)",
               gap: "0.75rem",
               flexWrap: "wrap",
             }}
           >
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#F4F5F7", letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--text-primary, #162334)", letterSpacing: "-0.01em" }}>
               {locationTitle}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
@@ -655,7 +785,6 @@ export default function CCTVCamerasPage({
                   height: "7px",
                   borderRadius: "50%",
                   background: statusColor,
-                  boxShadow: isOnline ? `0 0 6px ${statusColor}` : "none",
                 }}
               />
               <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: statusColor, letterSpacing: "0.08em" }}>
@@ -670,16 +799,19 @@ export default function CCTVCamerasPage({
             <div style={{ position: "relative", width: "100%" }}>
               <select
                 value={activeCamId}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const newCamId = e.target.value;
                   setActiveCamId(newCamId);
                   if (onSelectCamera) onSelectCamera(newCamId);
+                  setLiveTelemetry(null);
                   setStreamError(false);
                   setRetryCount(0);
-                  setStreamNonce(Date.now());
                   if (onStartCamera) {
-                    const videoName = currentSelectedVideoName;
-                    onStartCamera(newCamId, { video: videoName, auto_analysis: true });
+                    try {
+                      const videoName = userSelectedVideoRef.current || currentSelectedVideoName;
+                      await onStartCamera(newCamId, { video: videoName, auto_analysis: true });
+                      setStreamNonce(Date.now());
+                    } catch (err) {}
                   }
                 }}
                 style={{
@@ -687,9 +819,9 @@ export default function CCTVCamerasPage({
                   padding: "0.45rem 2rem 0.45rem 0.75rem",
                   fontSize: "0.8125rem",
                   fontWeight: 600,
-                  background: "#161920",
-                  color: "#F4F5F7",
-                  border: "1px solid #303746",
+                  background: "var(--bg-input, #FFFFFF)",
+                  color: "var(--text-primary, #162334)",
+                  border: "1px solid var(--border-default, #D8E0E8)",
                   borderRadius: "4px",
                   appearance: "none",
                   outline: "none",
@@ -698,13 +830,13 @@ export default function CCTVCamerasPage({
               >
                 {junctionCameras.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.approach || c.name || c.id}
+                    {tJunction(c.approach || c.name || c.id)}
                   </option>
                 ))}
               </select>
               <ChevronDown
                 size={14}
-                color="#9299A8"
+                color="var(--text-muted, #64748B)"
                 style={{
                   position: "absolute",
                   right: "0.75rem",
@@ -717,16 +849,16 @@ export default function CCTVCamerasPage({
 
             {/* Source Mode Toggles & Video Selection */}
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", background: "#161920", border: "1px solid #303746", borderRadius: "4px", padding: "2px" }}>
+              <div style={{ display: "flex", background: "var(--bg-surface-secondary, #EEF2F6)", border: "1px solid var(--border-default, #D8E0E8)", borderRadius: "4px", padding: "2px" }}>
                 <button
                   type="button"
-                  onClick={() => setSourceMode("video")}
+                  onClick={handleSwitchToVideo}
                   style={{
                     padding: "0.25rem 0.6rem",
                     fontSize: "0.6875rem",
                     fontWeight: 700,
-                    background: sourceMode === "video" ? "#222733" : "transparent",
-                    color: sourceMode === "video" ? "#F4F5F7" : "#9299A8",
+                    background: sourceMode === "video" ? "var(--accent, #245B86)" : "transparent",
+                    color: sourceMode === "video" ? "#FFFFFF" : "var(--text-secondary, #344256)",
                     border: "none",
                     borderRadius: "3px",
                     cursor: "pointer",
@@ -736,13 +868,13 @@ export default function CCTVCamerasPage({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSourceMode("ip")}
+                  onClick={handleSwitchToIp}
                   style={{
                     padding: "0.25rem 0.6rem",
                     fontSize: "0.6875rem",
                     fontWeight: 700,
-                    background: sourceMode === "ip" ? "#222733" : "transparent",
-                    color: sourceMode === "ip" ? "#F4F5F7" : "#9299A8",
+                    background: sourceMode === "ip" ? "var(--accent, #245B86)" : "transparent",
+                    color: sourceMode === "ip" ? "#FFFFFF" : "var(--text-secondary, #344256)",
                     border: "none",
                     borderRadius: "3px",
                     cursor: "pointer",
@@ -761,9 +893,9 @@ export default function CCTVCamerasPage({
                       flex: 1,
                       padding: "0.3rem 0.5rem",
                       fontSize: "0.75rem",
-                      background: "#161920",
-                      color: "#F4F5F7",
-                      border: "1px solid #303746",
+                      background: "var(--bg-input, #FFFFFF)",
+                      color: "var(--text-primary, #162334)",
+                      border: "1px solid var(--border-default, #D8E0E8)",
                       borderRadius: "4px",
                       outline: "none",
                       cursor: "pointer",
@@ -792,9 +924,9 @@ export default function CCTVCamerasPage({
                       padding: "0.3rem 0.6rem",
                       fontSize: "0.6875rem",
                       fontWeight: 700,
-                      background: "#1A1E26",
-                      color: "#F4F5F7",
-                      border: "1px solid #303746",
+                      background: "var(--bg-surface-secondary, #EEF2F6)",
+                      color: "var(--text-primary, #162334)",
+                      border: "1px solid var(--border-default, #D8E0E8)",
                       borderRadius: "4px",
                       cursor: isUploading ? "wait" : "pointer",
                       whiteSpace: "nowrap",
@@ -822,16 +954,25 @@ export default function CCTVCamerasPage({
                   <input
                     type="text"
                     value={rtspUrl}
-                    onChange={(e) => setRtspUrl(e.target.value)}
+                    onChange={(e) => {
+                      setRtspUrl(e.target.value);
+                      if (urlError) setUrlError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !isConnecting) {
+                        e.preventDefault();
+                        handleStartCamera();
+                      }
+                    }}
                     placeholder="rtsp://host:port/stream"
                     style={{
                       flex: 1,
                       padding: "0.3rem 0.5rem",
                       fontSize: "0.75rem",
                       fontFamily: "var(--font-mono, monospace)",
-                      background: "#161920",
-                      color: "#F4F5F7",
-                      border: "1px solid #303746",
+                      background: "var(--bg-input, #FFFFFF)",
+                      color: "var(--text-primary, #162334)",
+                      border: urlError ? "1px solid var(--state-red, #EF4444)" : "1px solid var(--border-default, #D8E0E8)",
                       borderRadius: "4px",
                       outline: "none",
                     }}
@@ -839,53 +980,61 @@ export default function CCTVCamerasPage({
                   <button
                     type="button"
                     onClick={handleStartCamera}
+                    disabled={isConnecting}
                     style={{
-                      padding: "0.3rem 0.6rem",
+                      padding: "0.3rem 0.75rem",
                       fontSize: "0.6875rem",
                       fontWeight: 700,
-                      background: "#222733",
-                      color: "#F4F5F7",
-                      border: "1px solid #303746",
+                      background: isConnecting ? "var(--border-default, #D8E0E8)" : "var(--accent, #245B86)",
+                      color: "#FFFFFF",
+                      border: "1px solid var(--accent, #245B86)",
                       borderRadius: "4px",
-                      cursor: "pointer",
+                      cursor: isConnecting ? "not-allowed" : "pointer",
                       whiteSpace: "nowrap",
                     }}
                   >
-                    Connect
+                    {isConnecting ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <Loader2 size={12} className="animate-spin" />
+                        {t("common.connecting", "Connecting...")}
+                      </span>
+                    ) : (
+                      t("common.connect", "Connect")
+                    )}
                   </button>
                 </div>
               )}
             </div>
             {urlError && (
-              <span style={{ fontSize: "0.6875rem", color: "#FF5B6E" }}>{urlError}</span>
+              <span style={{ fontSize: "0.6875rem", color: "var(--status-critical, #C94B59)" }}>{urlError}</span>
             )}
           </div>
 
           {/* 3. Telemetry Block */}
           <div
             style={{
-              background: "#13161C",
-              border: "1px solid #303746",
+              background: "var(--bg-card, #FFFFFF)",
+              border: "1px solid var(--border-default, #D8E0E8)",
               borderRadius: "4px",
               overflow: "hidden",
             }}
           >
             {/* Top Telemetry Row: VEHICLES, TRAFFIC, INCIDENTS */}
-            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", borderBottom: "1px solid #303746" }}>
-              <div style={{ padding: "0.75rem 0.85rem", borderRight: "1px solid #303746", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr", borderBottom: "1px solid var(--border-light, #E7ECF1)" }}>
+              <div style={{ padding: "0.75rem 0.85rem", borderRight: "1px solid var(--border-light, #E7ECF1)", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   {t("traffic.vehicles", "VEHICLES")}
                 </span>
-                <span style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "#F4F5F7", lineHeight: 1.1 }}>
+                <span style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)", lineHeight: 1.1 }}>
                   {valVehicles != null ? valVehicles : "—"}
                 </span>
               </div>
 
-              <div style={{ padding: "0.75rem 0.85rem", borderRight: "1px solid #303746", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              <div style={{ padding: "0.75rem 0.85rem", borderRight: "1px solid var(--border-light, #E7ECF1)", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   {t("traffic.flow", "TRAFFIC")}
                 </span>
-                <span style={{ fontSize: "1.05rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "#F4F5F7", lineHeight: 1.35 }}>
+                <span style={{ fontSize: "1.05rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)", lineHeight: 1.35 }}>
                   {valFlow != null ? valFlow : "—"}
                 </span>
               </div>
@@ -898,7 +1047,7 @@ export default function CCTVCamerasPage({
                   gap: "0.2rem",
                 }}
               >
-                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   {t("cctv.incidents", "INCIDENTS")}
                 </span>
                 <span
@@ -906,7 +1055,7 @@ export default function CCTVCamerasPage({
                     fontSize: locationIncidents.length > 0 ? "1.05rem" : "1.25rem",
                     fontWeight: 700,
                     fontFamily: "var(--font-mono, monospace)",
-                    color: locationIncidents.length > 0 ? "#FF5B6E" : "#737987",
+                    color: locationIncidents.length > 0 ? "var(--status-critical, #C94B59)" : "var(--text-muted, #64748B)",
                     lineHeight: 1.35,
                   }}
                 >
@@ -917,157 +1066,104 @@ export default function CCTVCamerasPage({
 
             {/* Breakdown Row: CARS, TRUCKS, BUSES, BIKES */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-              <div style={{ padding: "0.6rem 0.75rem", borderRight: "1px solid #303746", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <div style={{ padding: "0.6rem 0.75rem", borderRight: "1px solid var(--border-light, #E7ECF1)", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   {t("traffic.cars", "CARS")}
                 </span>
-                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "#F4F5F7" }}>
+                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)" }}>
                   {valCars != null ? valCars : "—"}
                 </span>
               </div>
 
-              <div style={{ padding: "0.6rem 0.75rem", borderRight: "1px solid #303746", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <div style={{ padding: "0.6rem 0.75rem", borderRight: "1px solid var(--border-light, #E7ECF1)", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   {t("traffic.trucks", "TRUCKS")}
                 </span>
-                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "#F4F5F7" }}>
+                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)" }}>
                   {valTrucks != null ? valTrucks : "—"}
                 </span>
               </div>
 
-              <div style={{ padding: "0.6rem 0.75rem", borderRight: "1px solid #303746", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <div style={{ padding: "0.6rem 0.75rem", borderRight: "1px solid var(--border-light, #E7ECF1)", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
+                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   {t("traffic.buses", "BUSES")}
                 </span>
-                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "#F4F5F7" }}>
+                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)" }}>
                   {valBuses != null ? valBuses : "—"}
                 </span>
               </div>
 
               <div style={{ padding: "0.6rem 0.75rem", display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "#9299A8", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #64748B)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
                   {t("traffic.bikes", "BIKES")}
                 </span>
-                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "#F4F5F7" }}>
+                <span style={{ fontSize: "1.15rem", fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)" }}>
                   {valBikes != null ? valBikes : "—"}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* 4. Operational Incident Status Area (No colored borders, no card boxes, clean and simple) */}
-          <div style={{ padding: "0.45rem 0", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {locationIncidents.length === 0 ? (
-              // Status summary when NO incident is detected
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#9299A8", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  {t("cctv.trafficIncident", "TRAFFIC INCIDENT")}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.18rem", fontSize: "0.75rem" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#9299A8" }}>{t("traffic.status", "Status")}</span>
-                    <span style={{ color: "#22C55E", fontWeight: 700 }}>{t("cctv.noAccidentDetected", "NO ACCIDENT DETECTED")}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#9299A8" }}>{t("cctv.emergency", "Emergency")}</span>
-                    <span style={{ color: "#22C55E", fontWeight: 700 }}>{t("cctv.noAmbulanceDetected", "NO AMBULANCE DETECTED")}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#9299A8" }}>{t("traffic.flow", "Traffic")}</span>
-                    <span style={{ color: "#22C55E", fontWeight: 700 }}>{t("status.normal", "NORMAL")}</span>
-                  </div>
-                </div>
+          {/* 4. Operational Incident Status Area (Is Incident Occurred / Is Ambulance Detected / Is Accident Occurred) */}
+          <div style={{ padding: "0.45rem 0", display: "flex", flexDirection: "column", gap: "0.55rem" }}>
+            <div style={{ fontSize: "0.875rem", fontWeight: 900, color: "var(--text-muted, #64748B)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              {t("cctv.trafficIncident", "TRAFFIC INCIDENT")}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", paddingTop: "0.2rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "1.0625rem", color: "var(--text-primary, #162334)", fontWeight: 800 }}>
+                  {t("cctv.isIncidentOccurred", "Is Incident Occurred")}
+                </span>
+                <span
+                  style={{
+                    fontSize: "1.125rem",
+                    color: hasIncident ? "var(--state-red, #C94B59)" : "var(--state-green, #2E8B57)",
+                    fontWeight: 900,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {hasIncident ? t("common.yes", "YES") : t("common.no", "NO")}
+                </span>
               </div>
-            ) : (
-              // When one or more incidents / emergencies are detected
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-                {locationIncidents.map((inc, idx) => {
-                  const isAmbulance = (inc.type || inc.title || "").toLowerCase().includes("ambulance");
-                  const headline = isAmbulance
-                    ? t("cctv.ambulanceDetected", "AMBULANCE DETECTED")
-                    : getAccidentHeadline(inc).includes("BIKE")
-                    ? t("cctv.bikeAccidentDetected", "BIKE ACCIDENT DETECTED")
-                    : t("cctv.accidentDetected", "ACCIDENT DETECTED");
-                  const titleCategory = isAmbulance
-                    ? t("cctv.emergencyVehicle", "EMERGENCY VEHICLE")
-                    : t("cctv.trafficIncident", "TRAFFIC INCIDENT");
-                  const titleColor = "#F59E0B";
 
-                  return (
-                    <div
-                      key={inc.id || idx}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "0.25rem",
-                        paddingBottom: idx < locationIncidents.length - 1 ? "0.65rem" : "0",
-                        borderBottom: idx < locationIncidents.length - 1 ? "1px solid #2C303C" : "none",
-                      }}
-                    >
-                      <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: titleColor, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                        {titleCategory}
-                      </div>
-                      <div style={{ fontSize: "0.9375rem", fontWeight: 900, color: titleColor, textTransform: "uppercase", letterSpacing: "0.02em" }}>
-                        {headline}
-                      </div>
-                      <div style={{ fontSize: "0.75rem", color: "#F4F5F7", fontWeight: 700 }}>
-                        {tJunction ? tJunction(inc.junction || inc.location || currentJunction?.name || locationTitle) : (inc.junction || inc.location || currentJunction?.name || locationTitle)} · {formatIncidentTime(inc.timestamp)}
-                      </div>
-                      <div style={{ fontSize: "0.75rem", color: "#A0A5B5", lineHeight: 1.4 }}>
-                        {inc.reason || inc.description || t("cctv.movementAffected", "Traffic movement affected.")}
-                      </div>
-                      <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (onNavigateTab) onNavigateTab("map");
-                            if (onSelectJunction && currentJunction) onSelectJunction(currentJunction);
-                          }}
-                          style={{
-                            height: "28px",
-                            padding: "0 0.85rem",
-                            fontSize: "0.6875rem",
-                            fontWeight: 800,
-                            letterSpacing: "0.04em",
-                            background: "#222733",
-                            color: "#7B8BC8",
-                            border: "1px solid #3D3F4E",
-                            borderRadius: "3px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {t("actions.viewLocation", "VIEW LOCATION")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setStreamNonce(Date.now())}
-                          style={{
-                            height: "28px",
-                            padding: "0 0.85rem",
-                            fontSize: "0.6875rem",
-                            fontWeight: 800,
-                            letterSpacing: "0.04em",
-                            background: "#222733",
-                            color: "#F4F5F7",
-                            border: "1px solid #3D3F4E",
-                            borderRadius: "3px",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {t("actions.viewCCTV", "VIEW CCTV")}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "1.0625rem", color: "var(--text-primary, #162334)", fontWeight: 800 }}>
+                  {t("cctv.isAmbulanceDetected", "Is Ambulance Detected")}
+                </span>
+                <span
+                  style={{
+                    fontSize: "1.125rem",
+                    color: hasAmbulance ? "var(--state-amber, #B08A2E)" : "var(--state-green, #2E8B57)",
+                    fontWeight: 900,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {hasAmbulance ? t("common.yes", "YES") : t("common.no", "NO")}
+                </span>
               </div>
-            )}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "1.0625rem", color: "var(--text-primary, #162334)", fontWeight: 800 }}>
+                  {t("cctv.isAccidentOccurred", "Is Accident Occurred")}
+                </span>
+                <span
+                  style={{
+                    fontSize: "1.125rem",
+                    color: hasAccident ? "var(--state-red, #C94B59)" : "var(--state-green, #2E8B57)",
+                    fontWeight: 900,
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {hasAccident ? t("common.yes", "YES") : t("common.no", "NO")}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* 5. Expandable Details */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem", marginTop: "0.25rem" }}>
             {/* Toggle Line: Camera details */}
-            <div style={{ borderTop: "1px solid #303746", paddingTop: "0.35rem" }}>
+            <div style={{ borderTop: "1px solid var(--border-default, #D8E0E8)", paddingTop: "0.35rem" }}>
               <button
                 type="button"
                 onClick={() => setIsInfoExpanded(!isInfoExpanded)}
@@ -1083,11 +1179,11 @@ export default function CCTVCamerasPage({
                   textAlign: "left",
                 }}
               >
-                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "#9299A8" }}>
-                  Camera details
+                <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-secondary, #344256)" }}>
+                  {t("cctv.cameraDetails", "Camera details")}
                 </span>
-                <span style={{ fontSize: "0.6875rem", color: "#7C8FD8", fontWeight: 600 }}>
-                  {isInfoExpanded ? "Hide \u25B4" : "Show \u25BE"}
+                <span style={{ fontSize: "0.6875rem", color: "var(--accent, #245B86)", fontWeight: 600 }}>
+                  {isInfoExpanded ? `${t("cctv.hideDetails", "Hide")} \u25B4` : `${t("cctv.showDetails", "Show")} \u25BE`}
                 </span>
               </button>
 
@@ -1098,29 +1194,29 @@ export default function CCTVCamerasPage({
                     gridTemplateColumns: "1fr 1fr",
                     gap: "0.6rem",
                     padding: "0.6rem 0.75rem",
-                    background: "#13161C",
-                    border: "1px solid #303746",
+                    background: "var(--bg-card-subtle, #F8FAFC)",
+                    border: "1px solid var(--border-default, #D8E0E8)",
                     borderRadius: "4px",
                     marginTop: "0.25rem",
                   }}
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "0.625rem", color: "#9299A8", textTransform: "uppercase", fontWeight: 600 }}>Location</span>
-                    <span style={{ fontSize: "0.75rem", color: "#F4F5F7" }}>{locationTitle}</span>
+                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #64748B)", textTransform: "uppercase", fontWeight: 600 }}>{t("cctv.location", "Location")}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-primary, #162334)" }}>{locationTitle}</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "0.625rem", color: "#9299A8", textTransform: "uppercase", fontWeight: 600 }}>Status</span>
+                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #64748B)", textTransform: "uppercase", fontWeight: 600 }}>{t("cctv.status", "Status")}</span>
                     <span style={{ fontSize: "0.75rem", color: statusColor, fontWeight: 700 }}>{statusText}</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "0.625rem", color: "#9299A8", textTransform: "uppercase", fontWeight: 600 }}>Source</span>
-                    <span style={{ fontSize: "0.75rem", color: "#F4F5F7", fontFamily: "var(--font-mono, monospace)" }}>
+                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #64748B)", textTransform: "uppercase", fontWeight: 600 }}>{t("cctv.source", "Source")}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-primary, #162334)", fontFamily: "var(--font-mono, monospace)" }}>
                       {sourceMode === "ip" ? rtspUrl : currentSelectedVideoName}
                     </span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
-                    <span style={{ fontSize: "0.625rem", color: "#9299A8", textTransform: "uppercase", fontWeight: 600 }}>Updated</span>
-                    <span style={{ fontSize: "0.75rem", color: "#F4F5F7", fontFamily: "var(--font-mono, monospace)" }}>{lastUpdatedTime}</span>
+                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #64748B)", textTransform: "uppercase", fontWeight: 600 }}>{t("cctv.updated", "Updated")}</span>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-primary, #162334)", fontFamily: "var(--font-mono, monospace)" }}>{lastUpdatedTime}</span>
                   </div>
                 </div>
               )}

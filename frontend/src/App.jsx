@@ -302,6 +302,9 @@ function AppContent() {
         if (telData && !telData.error && telData.telemetry) {
           setTelemetry(telData.telemetry);
           setCameraStatus("online");
+        } else if (telData && (telData.status === "stopped" || telData.status === "offline" || telData.status === "error" || telData.status === "disconnected")) {
+          setCameraStatus(telData.status);
+          setTelemetry(null);
         }
 
         const fcData = await getCameraForecast(activeCameraId).catch(() => null);
@@ -406,7 +409,11 @@ function AppContent() {
   // 3. Camera Handlers
   const handleStartCamera = async (camId = activeCameraId, options = {}) => {
     setIsLoadingCameraAction(true);
+    setTelemetry(null);
     try {
+      if (activeCameraId && activeCameraId !== camId) {
+        await stopCamera(activeCameraId).catch(() => {});
+      }
       await startCamera(camId, options);
       setActiveCameraId(camId);
       setCameraStatus("online");
@@ -416,6 +423,9 @@ function AppContent() {
       if (fc?.forecast) setForecast(fc.forecast);
     } catch (err) {
       console.error("Start camera failed:", err);
+      setCameraStatus("offline");
+      setTelemetry(null);
+      throw err;
     } finally {
       setIsLoadingCameraAction(false);
     }
@@ -424,12 +434,12 @@ function AppContent() {
   const handleStopCamera = async (camId = activeCameraId) => {
     setIsLoadingCameraAction(true);
     try {
-      await stopCamera(camId);
-      setCameraStatus("offline");
-      setTelemetry(null);
+      await stopCamera(camId).catch(() => {});
     } catch (err) {
       console.error("Stop camera failed:", err);
     } finally {
+      setCameraStatus("offline");
+      setTelemetry(null);
       setIsLoadingCameraAction(false);
     }
   };
@@ -633,6 +643,16 @@ function AppContent() {
         zoom: 14.5,
         _ts: Date.now(),
       });
+      const relevantJncs = trafficService.getRelevantJunctions([jnc.coords[0], jnc.coords[1]], 45);
+      if (relevantJncs && relevantJncs.length > 0) {
+        setAreaJunctions(relevantJncs);
+      }
+      if (jnc.district) {
+        const dKey = jnc.district.toLowerCase();
+        setSelectedDistrict(dKey);
+        setDistrictName(jnc.district);
+        setAreaOverview(trafficService.getAreaOverview(dKey));
+      }
       if (jnc.cameras && jnc.cameras.length > 0) {
         const firstOnline = jnc.cameras.find((c) => c.status === "ONLINE") || jnc.cameras[0];
         setActiveCameraId(firstOnline.id);
@@ -796,10 +816,14 @@ function AppContent() {
 
   // Render Active Page View
   const renderActivePage = () => {
-    if (operatingMode === "field") {
+    if (activeTab === "field" || (operatingMode === "field" && activeTab !== "dashboard" && activeTab !== "map" && activeTab !== "cctv" && activeTab !== "routing" && activeTab !== "predictions" && activeTab !== "settings")) {
       return (
         <OfficerFieldApp
-          onSwitchMode={() => setOperatingMode("control")}
+          onSwitchMode={() => {
+            setOperatingMode("control");
+            updateSetting("workingMode", null, "control");
+            setActiveTab("dashboard");
+          }}
         />
       );
     }

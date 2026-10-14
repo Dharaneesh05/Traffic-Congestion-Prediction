@@ -6,20 +6,21 @@ import { RotateCcw } from "lucide-react";
  * Clean Flat Toggle Switch with clear ON / OFF status indicator
  */
 function ToggleSwitch({ checked, onChange, id }) {
+  const { t } = useSettings();
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: "0.6rem" }}>
       <span
         style={{
           fontSize: "0.75rem",
           fontWeight: 700,
-          color: checked ? "#22C55E" : "#94A3B8",
+          color: checked ? "var(--status-normal, #2E8B57)" : "var(--text-muted, #64748B)",
           fontFamily: "var(--font-mono, monospace)",
           minWidth: "26px",
           textAlign: "right",
           letterSpacing: "0.04em",
         }}
       >
-        {checked ? "ON" : "OFF"}
+        {checked ? t("common.on", "ON") : t("common.off", "OFF")}
       </span>
       <button
         type="button"
@@ -31,8 +32,8 @@ function ToggleSwitch({ checked, onChange, id }) {
           width: "36px",
           height: "20px",
           borderRadius: "10px",
-          background: checked ? "#22C55E" : "#252936",
-          border: checked ? "1px solid #22C55E" : "1px solid #3D3F4E",
+          background: checked ? "var(--status-normal, #2E8B57)" : "var(--bg-surface-secondary, #EEF2F6)",
+          border: checked ? "1px solid var(--status-normal, #2E8B57)" : "1px solid var(--border-default, #D8E0E8)",
           cursor: "pointer",
           position: "relative",
           transition: "all 0.15s ease",
@@ -52,7 +53,7 @@ function ToggleSwitch({ checked, onChange, id }) {
             top: "3px",
             left: checked ? "19px" : "3px",
             transition: "left 0.15s ease",
-            boxShadow: "0 1px 2px rgba(0,0,0,0.3)",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
           }}
         />
       </button>
@@ -68,10 +69,10 @@ function SegmentedControl({ options, value, onChange }) {
     <div
       style={{
         display: "inline-flex",
-        background: "#11141A",
+        background: "var(--bg-surface-secondary, #EEF2F6)",
         padding: "2px",
-        borderRadius: "3px",
-        border: "1px solid #29313D",
+        borderRadius: "4px",
+        border: "1px solid var(--border-default, #D8E0E8)",
         gap: "2px",
       }}
     >
@@ -86,12 +87,12 @@ function SegmentedControl({ options, value, onChange }) {
               padding: "0.3rem 0.75rem",
               fontSize: "0.8125rem",
               fontWeight: isSelected ? 700 : 500,
-              color: isSelected ? "#F8FAFC" : "#94A3B8",
-              background: isSelected ? "var(--accent-indigo, #3E4776)" : "transparent",
-              border: isSelected ? "1px solid rgba(123, 139, 200, 0.4)" : "1px solid transparent",
-              borderRadius: "2px",
+              color: isSelected ? "#FFFFFF" : "var(--text-secondary, #344256)",
+              background: isSelected ? "var(--accent, #245B86)" : "transparent",
+              border: isSelected ? "1px solid var(--accent, #245B86)" : "1px solid transparent",
+              borderRadius: "3px",
               cursor: "pointer",
-              transition: "all 0.1s ease",
+              transition: "all 0.12s ease",
               letterSpacing: "0.02em",
               whiteSpace: "nowrap",
             }}
@@ -121,12 +122,12 @@ function MultiPills({ options, values = {}, onChange }) {
               padding: "0.3rem 0.75rem",
               fontSize: "0.8125rem",
               fontWeight: isSelected ? 700 : 500,
-              color: isSelected ? "#F8FAFC" : "#94A3B8",
-              background: isSelected ? "var(--accent-indigo, #3E4776)" : "#11141A",
-              border: isSelected ? "1px solid rgba(123, 139, 200, 0.4)" : "1px solid #29313D",
-              borderRadius: "2px",
+              color: isSelected ? "#FFFFFF" : "var(--text-secondary, #344256)",
+              background: isSelected ? "var(--accent, #245B86)" : "var(--bg-surface-secondary, #EEF2F6)",
+              border: isSelected ? "1px solid var(--accent, #245B86)" : "1px solid var(--border-default, #D8E0E8)",
+              borderRadius: "3px",
               cursor: "pointer",
-              transition: "all 0.1s ease",
+              transition: "all 0.12s ease",
               letterSpacing: "0.02em",
             }}
           >
@@ -149,7 +150,7 @@ function SettingRow({ label, children }) {
         justifyContent: "space-between",
         alignItems: "center",
         padding: "0.85rem 0",
-        borderBottom: "1px solid #29313D",
+        borderBottom: "1px solid var(--border-light, #E7ECF1)",
         gap: "1.5rem",
         minHeight: "44px",
       }}
@@ -158,7 +159,7 @@ function SettingRow({ label, children }) {
         style={{
           fontSize: "0.9375rem",
           fontWeight: 600,
-          color: "#F8FAFC",
+          color: "var(--text-primary, #162334)",
           letterSpacing: "-0.01em",
         }}
       >
@@ -179,12 +180,12 @@ function SectionHeader({ title, id, isFirst = false }) {
       style={{
         fontSize: "0.8125rem",
         fontWeight: 700,
-        color: "#94A3B8",
+        color: "var(--text-muted, #64748B)",
         letterSpacing: "0.06em",
         textTransform: "uppercase",
         paddingTop: isFirst ? "0.45rem" : "1.5rem",
         paddingBottom: "0.5rem",
-        borderBottom: "1px solid #29313D",
+        borderBottom: "1px solid var(--border-default, #D8E0E8)",
         marginTop: 0,
       }}
     >
@@ -193,20 +194,20 @@ function SectionHeader({ title, id, isFirst = false }) {
   );
 }
 
-const SECTIONS = [
-  { id: "general", label: "General" },
-  { id: "display", label: "Display" },
-  { id: "traffic", label: "Traffic" },
-  { id: "map", label: "Map" },
-  { id: "alerts", label: "Alerts" },
-  { id: "working-mode", label: "Working mode" },
-];
-
 export default function SettingsPage({ onSwitchWorkingMode }) {
-  const { settings, updateSetting, resetToDefaults } = useSettings();
+  const { settings, updateSetting, resetToDefaults, t } = useSettings();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [activeSection, setActiveSection] = useState("general");
   const scrollContainerRef = useRef(null);
+
+  const sections = [
+    { id: "general", label: t("settings.general", "General") },
+    { id: "display", label: t("settings.display", "Display") },
+    { id: "traffic", label: t("settings.traffic", "Traffic") },
+    { id: "map", label: t("settings.map", "Map") },
+    { id: "alerts", label: t("settings.alerts", "Alerts") },
+    { id: "working-mode", label: t("settings.workingMode", "Working mode") },
+  ];
 
   const handleWorkingModeChange = (mode) => {
     updateSetting("workingMode", null, mode);
@@ -240,10 +241,10 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
     const handleScroll = () => {
       const scrollPos = container.scrollTop + 60;
-      for (let i = SECTIONS.length - 1; i >= 0; i--) {
-        const sec = document.getElementById(`settings-sec-${SECTIONS[i].id}`);
+      for (let i = sections.length - 1; i >= 0; i--) {
+        const sec = document.getElementById(`settings-sec-${sections[i].id}`);
         if (sec && sec.offsetTop - container.offsetTop <= scrollPos) {
-          setActiveSection(SECTIONS[i].id);
+          setActiveSection(sections[i].id);
           break;
         }
       }
@@ -251,18 +252,17 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => container.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [sections]);
 
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        maxWidth: "1080px",
-        margin: "0 auto",
         width: "100%",
+        maxWidth: "100%",
         height: "calc(100vh - 78px)",
-        padding: "0.5rem 1.25rem 1.5rem 1.25rem",
+        padding: "0.75rem 2rem 1.5rem 2rem",
         boxSizing: "border-box",
         fontFamily: "var(--font-sans)",
       }}
@@ -271,14 +271,14 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
       <div style={{ paddingBottom: "1.25rem", flexShrink: 0 }}>
         <h1
           style={{
-            fontSize: "1.25rem",
+            fontSize: "1.375rem",
             fontWeight: 800,
-            color: "#F8FAFC",
+            color: "var(--text-primary, #162334)",
             margin: 0,
             letterSpacing: "-0.01em",
           }}
         >
-          Settings
+          {t("settings.title", "Settings")}
         </h1>
       </div>
 
@@ -286,7 +286,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
       <div
         style={{
           display: "flex",
-          gap: "2.5rem",
+          gap: "2.75rem",
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
@@ -295,16 +295,16 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
         {/* Left Navigation: Sticky / Fixed */}
         <nav
           style={{
-            width: "180px",
+            width: "210px",
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
-            gap: "4px",
+            gap: "5px",
             paddingTop: 0,
             marginTop: 0,
           }}
         >
-          {SECTIONS.map((sec) => {
+          {sections.map((sec) => {
             const isActive = activeSection === sec.id;
             return (
               <button
@@ -315,29 +315,26 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
                   display: "flex",
                   alignItems: "center",
                   width: "100%",
-                  padding: "0.45rem 0.75rem",
+                  padding: "0.55rem 0.95rem",
                   fontSize: "0.875rem",
                   fontWeight: isActive ? 700 : 500,
-                  color: isActive ? "#F8FAFC" : "#94A3B8",
-                  background: isActive ? "rgba(123, 139, 200, 0.08)" : "transparent",
+                  color: isActive ? "var(--text-primary, #162334)" : "var(--text-secondary, #344256)",
+                  background: isActive ? "var(--bg-surface-secondary, #EEF2F6)" : "transparent",
                   border: "none",
-                  borderLeft: isActive
-                    ? "2px solid var(--accent-soft-blue, #7B8BC8)"
-                    : "2px solid transparent",
-                  borderRadius: "0 3px 3px 0",
+                  borderRadius: "4px",
                   cursor: "pointer",
                   textAlign: "left",
                   transition: "all 0.15s ease",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.color = "#CBD5E1";
-                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)";
+                    e.currentTarget.style.color = "var(--text-primary, #162334)";
+                    e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.color = "#94A3B8";
+                    e.currentTarget.style.color = "var(--text-secondary, #344256)";
                     e.currentTarget.style.background = "transparent";
                   }
                 }}
@@ -367,9 +364,9 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
         >
           {/* 1. GENERAL */}
           <div>
-            <SectionHeader title="GENERAL" id="settings-sec-general" isFirst={true} />
+            <SectionHeader title={t("settings.general", "GENERAL").toUpperCase()} id="settings-sec-general" isFirst={true} />
 
-            <SettingRow label="Language">
+            <SettingRow label={t("settings.language", "Language")}>
               <SegmentedControl
                 value={settings.language}
                 onChange={(val) => updateSetting("language", null, val)}
@@ -380,26 +377,26 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="Speed unit">
+            <SettingRow label={t("settings.speedUnit", "Speed unit")}>
               <SegmentedControl
                 value={settings.speedUnit || "km/h"}
                 onChange={(val) => updateSetting("speedUnit", null, val)}
                 options={[
-                  { value: "km/h", label: "km/h" },
-                  { value: "mph", label: "mph" },
+                  { value: "km/h", label: t("settings.speedKmh", "km/h") },
+                  { value: "mph", label: t("settings.speedMph", "mph") },
                 ]}
               />
             </SettingRow>
 
-            <SettingRow label="Auto refresh">
+            <SettingRow label={t("settings.autoRefresh", "Auto refresh")}>
               <SegmentedControl
                 value={settings.autoRefresh}
                 onChange={(val) => updateSetting("autoRefresh", null, Number(val))}
                 options={[
-                  { value: 0, label: "Off" },
-                  { value: 15, label: "15s" },
-                  { value: 30, label: "30s" },
-                  { value: 60, label: "60s" },
+                  { value: 0, label: t("settings.refreshOff", "Off") },
+                  { value: 15, label: t("settings.refresh15s", "15s") },
+                  { value: 30, label: t("settings.refresh30s", "30s") },
+                  { value: 60, label: t("settings.refresh60s", "60s") },
                 ]}
               />
             </SettingRow>
@@ -407,27 +404,27 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
           {/* 2. DISPLAY */}
           <div>
-            <SectionHeader title="DISPLAY" id="settings-sec-display" />
+            <SectionHeader title={t("settings.display", "DISPLAY").toUpperCase()} id="settings-sec-display" />
 
-            <SettingRow label="Theme">
+            <SettingRow label={t("settings.theme", "Theme")}>
               <SegmentedControl
                 value={settings.theme}
                 onChange={(val) => updateSetting("theme", null, val)}
                 options={[
-                  { value: "dark", label: "Dark" },
-                  { value: "light", label: "Light" },
-                  { value: "system", label: "System" },
+                  { value: "dark", label: t("settings.themeDark", "Dark") },
+                  { value: "light", label: t("settings.themeLight", "Light") },
+                  { value: "system", label: t("settings.themeSystem", "System") },
                 ]}
               />
             </SettingRow>
 
-            <SettingRow label="Density">
+            <SettingRow label={t("settings.density", "Density")}>
               <SegmentedControl
                 value={settings.density}
                 onChange={(val) => updateSetting("density", null, val)}
                 options={[
-                  { value: "compact", label: "Compact" },
-                  { value: "comfortable", label: "Comfortable" },
+                  { value: "compact", label: t("settings.densityCompact", "Compact") },
+                  { value: "comfortable", label: t("settings.densityComfortable", "Comfortable") },
                 ]}
               />
             </SettingRow>
@@ -435,53 +432,53 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
           {/* 3. TRAFFIC */}
           <div>
-            <SectionHeader title="TRAFFIC" id="settings-sec-traffic" />
+            <SectionHeader title={t("settings.traffic", "TRAFFIC").toUpperCase()} id="settings-sec-traffic" />
 
-            <SettingRow label="Default location">
+            <SettingRow label={t("settings.defaultLocation", "Default location")}>
               <SegmentedControl
                 value={settings.defaultMapView}
                 onChange={(val) => updateSetting("defaultMapView", null, val)}
                 options={[
-                  { value: "current", label: "Current location" },
-                  { value: "selected", label: "Selected location" },
-                  { value: "tamil_nadu", label: "Tamil Nadu" },
+                  { value: "current", label: t("settings.viewCurrent", "Current location") },
+                  { value: "selected", label: t("settings.viewSelected", "Selected location") },
+                  { value: "tamil_nadu", label: t("settings.viewTamilNadu", "Tamil Nadu") },
                 ]}
               />
             </SettingRow>
 
-            <SettingRow label="Speed unit">
+            <SettingRow label={t("settings.speedUnit", "Speed unit")}>
               <SegmentedControl
                 value={settings.speedUnit || "km/h"}
                 onChange={(val) => updateSetting("speedUnit", null, val)}
                 options={[
-                  { value: "km/h", label: "km/h" },
-                  { value: "mph", label: "mph" },
+                  { value: "km/h", label: t("settings.speedKmh", "km/h") },
+                  { value: "mph", label: t("settings.speedMph", "mph") },
                 ]}
               />
             </SettingRow>
 
-            <SettingRow label="Vehicle categories">
+            <SettingRow label={t("settings.vehicleCategories", "Vehicle categories")}>
               <MultiPills
                 values={settings.vehicleCategories || { cars: true, trucks: true, buses: true, bikes: true }}
                 onChange={(catKey, checked) => updateSetting("vehicleCategories", catKey, checked)}
                 options={[
-                  { key: "cars", label: "Cars" },
-                  { key: "trucks", label: "Trucks" },
-                  { key: "buses", label: "Buses" },
-                  { key: "bikes", label: "Bikes" },
+                  { key: "cars", label: t("traffic.cars", "Cars") },
+                  { key: "trucks", label: t("traffic.trucks", "Trucks") },
+                  { key: "buses", label: t("traffic.buses", "Buses") },
+                  { key: "bikes", label: t("traffic.bikes", "Bikes") },
                 ]}
               />
             </SettingRow>
 
-            <SettingRow label="Auto refresh">
+            <SettingRow label={t("settings.autoRefresh", "Auto refresh")}>
               <SegmentedControl
                 value={settings.autoRefresh}
                 onChange={(val) => updateSetting("autoRefresh", null, Number(val))}
                 options={[
-                  { value: 0, label: "Off" },
-                  { value: 15, label: "15s" },
-                  { value: 30, label: "30s" },
-                  { value: 60, label: "60s" },
+                  { value: 0, label: t("settings.refreshOff", "Off") },
+                  { value: 15, label: t("settings.refresh15s", "15s") },
+                  { value: 30, label: t("settings.refresh30s", "30s") },
+                  { value: 60, label: t("settings.refresh60s", "60s") },
                 ]}
               />
             </SettingRow>
@@ -489,22 +486,22 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
           {/* 4. MAP */}
           <div>
-            <SectionHeader title="MAP" id="settings-sec-map" />
+            <SectionHeader title={t("settings.map", "MAP").toUpperCase()} id="settings-sec-map" />
 
-            <SettingRow label="Map style">
+            <SettingRow label={t("settings.mapStyle", "Map style")}>
               <SegmentedControl
                 value={settings.mapStyle}
                 onChange={(val) => updateSetting("mapStyle", null, val)}
                 options={[
-                  { value: "standard", label: "Standard" },
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                  { value: "satellite", label: "Satellite" },
+                  { value: "standard", label: t("settings.styleStandard", "Standard") },
+                  { value: "light", label: t("settings.themeLight", "Light") },
+                  { value: "dark", label: t("settings.themeDark", "Dark") },
+                  { value: "satellite", label: t("settings.styleSatellite", "Satellite") },
                 ]}
               />
             </SettingRow>
 
-            <SettingRow label="Junction status">
+            <SettingRow label={t("settings.junctionStatus", "Junction status")}>
               <ToggleSwitch
                 id="toggle-junction-layer"
                 checked={settings.mapLayers.showJunctionStatus}
@@ -512,7 +509,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="CCTV cameras">
+            <SettingRow label={t("settings.cctvCameras", "CCTV cameras")}>
               <ToggleSwitch
                 id="toggle-camera-layer"
                 checked={settings.mapLayers.showCctvCameras}
@@ -520,7 +517,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="Active incidents">
+            <SettingRow label={t("settings.activeIncidents", "Active incidents")}>
               <ToggleSwitch
                 id="toggle-incident-layer"
                 checked={settings.mapLayers.showActiveIncidents}
@@ -528,7 +525,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="Recommended routes">
+            <SettingRow label={t("settings.recommendedRoutes", "Recommended routes")}>
               <ToggleSwitch
                 id="toggle-route-layer"
                 checked={settings.mapLayers.showRecommendedRoutes}
@@ -539,9 +536,9 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
           {/* 5. ALERTS */}
           <div>
-            <SectionHeader title="ALERTS" id="settings-sec-alerts" />
+            <SectionHeader title={t("settings.alerts", "ALERTS").toUpperCase()} id="settings-sec-alerts" />
 
-            <SettingRow label="Critical incidents">
+            <SettingRow label={t("settings.criticalIncidents", "Critical incidents")}>
               <ToggleSwitch
                 id="toggle-notif-critical"
                 checked={settings.notifications.critical}
@@ -549,7 +546,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="Traffic congestion">
+            <SettingRow label={t("settings.trafficCongestion", "Traffic congestion")}>
               <ToggleSwitch
                 id="toggle-notif-high"
                 checked={settings.notifications.highPriority}
@@ -557,7 +554,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="Camera offline">
+            <SettingRow label={t("settings.cameraOffline", "Camera offline")}>
               <ToggleSwitch
                 id="toggle-notif-camera"
                 checked={settings.notifications.cameraOffline}
@@ -565,7 +562,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
               />
             </SettingRow>
 
-            <SettingRow label="Route changes">
+            <SettingRow label={t("settings.routeChanges", "Route changes")}>
               <ToggleSwitch
                 id="toggle-notif-diversion"
                 checked={settings.notifications.diversionUpdates}
@@ -576,15 +573,15 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
 
           {/* 6. WORKING MODE */}
           <div>
-            <SectionHeader title="WORKING MODE" id="settings-sec-working-mode" />
+            <SectionHeader title={t("settings.workingMode", "WORKING MODE").toUpperCase()} id="settings-sec-working-mode" />
 
-            <SettingRow label="Mode">
+            <SettingRow label={t("settings.mode", "Mode")}>
               <SegmentedControl
                 value={settings.workingMode}
                 onChange={handleWorkingModeChange}
                 options={[
-                  { value: "control", label: "Control Room" },
-                  { value: "field", label: "Field Officer" },
+                  { value: "control", label: t("settings.modeControl", "Control Room") },
+                  { value: "field", label: t("settings.modeField", "Field Officer") },
                 ]}
               />
             </SettingRow>
@@ -598,30 +595,32 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
                 onClick={() => setShowResetConfirm(true)}
                 style={{
                   background: "transparent",
-                  border: "1px solid #29313D",
-                  color: "#94A3B8",
-                  borderRadius: "3px",
-                  padding: "0.4rem 0.85rem",
+                  border: "1px solid var(--border-default, #D8E0E8)",
+                  color: "var(--text-muted, #64748B)",
+                  borderRadius: "4px",
+                  padding: "0.45rem 0.95rem",
                   fontSize: "0.75rem",
                   fontWeight: 600,
                   letterSpacing: "0.03em",
                   cursor: "pointer",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "0.4rem",
+                  gap: "0.45rem",
                   transition: "all 0.15s ease",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#F8FAFC";
-                  e.currentTarget.style.borderColor = "#3D3F4E";
+                  e.currentTarget.style.color = "var(--text-primary, #162334)";
+                  e.currentTarget.style.borderColor = "var(--border-strong, #B9C5D1)";
+                  e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = "#94A3B8";
-                  e.currentTarget.style.borderColor = "#29313D";
+                  e.currentTarget.style.color = "var(--text-muted, #64748B)";
+                  e.currentTarget.style.borderColor = "var(--border-default, #D8E0E8)";
+                  e.currentTarget.style.background = "transparent";
                 }}
               >
                 <RotateCcw size={13} />
-                Reset to defaults
+                {t("settings.reset", "Reset to defaults")}
               </button>
             ) : (
               <div
@@ -629,22 +628,22 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
                   display: "flex",
                   alignItems: "center",
                   gap: "0.75rem",
-                  background: "rgba(244, 94, 112, 0.08)",
-                  border: "1px solid rgba(244, 94, 112, 0.3)",
-                  padding: "0.5rem 0.85rem",
-                  borderRadius: "3px",
+                  background: "var(--state-red-subtle, rgba(201, 75, 89, 0.08))",
+                  border: "1px solid var(--state-red, #C94B59)",
+                  padding: "0.6rem 0.95rem",
+                  borderRadius: "4px",
                   flexWrap: "wrap",
                 }}
               >
-                <span style={{ fontSize: "0.75rem", color: "#FF5B6E", fontWeight: 600 }}>
-                  Reset all preferences and display settings to defaults?
+                <span style={{ fontSize: "0.75rem", color: "var(--state-red, #C94B59)", fontWeight: 600 }}>
+                  {t("settings.resetConfirm", "Reset all system preferences and display settings to defaults?")}
                 </span>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <button
                     type="button"
                     onClick={handleConfirmReset}
                     style={{
-                      background: "#FF5B6E",
+                      background: "var(--state-red, #C94B59)",
                       border: "none",
                       color: "#FFFFFF",
                       borderRadius: "3px",
@@ -654,15 +653,15 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
                       cursor: "pointer",
                     }}
                   >
-                    Confirm
+                    {t("common.confirm", "Confirm")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowResetConfirm(false)}
                     style={{
-                      background: "#252936",
-                      border: "1px solid #3D3F4E",
-                      color: "#CBD5E1",
+                      background: "var(--bg-surface-secondary, #EEF2F6)",
+                      border: "1px solid var(--border-default, #D8E0E8)",
+                      color: "var(--text-primary, #162334)",
                       borderRadius: "3px",
                       padding: "0.25rem 0.65rem",
                       fontSize: "0.6875rem",
@@ -670,7 +669,7 @@ export default function SettingsPage({ onSwitchWorkingMode }) {
                       cursor: "pointer",
                     }}
                   >
-                    Cancel
+                    {t("common.cancel", "Cancel")}
                   </button>
                 </div>
               </div>

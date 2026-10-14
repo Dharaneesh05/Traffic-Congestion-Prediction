@@ -163,7 +163,7 @@ export default function MonitoredJunctionsTable({
               onMouseLeave={(e) => {
                 if (statusFilter === "ALL") e.currentTarget.style.color = "var(--text-muted, #737987)";
               }}
-              title="Filter status/severity"
+              title={t("header.filterCategory", "Filter status/severity")}
               aria-label="Filter junctions"
             >
               <Filter size={14} strokeWidth={2.2} />
@@ -275,7 +275,7 @@ export default function MonitoredJunctionsTable({
                 alignItems: "center",
                 color: "var(--text-muted, #737987)",
               }}
-              title="Clear search"
+              title={t("header.clearSearch", "Clear search")}
             >
               <X size={13} />
             </button>
@@ -324,7 +324,7 @@ export default function MonitoredJunctionsTable({
             {filteredJunctions.length === 0 ? (
               <tr>
                 <td colSpan={10} style={{ padding: "1.5rem", textAlign: "center", color: "var(--text-muted, #737987)", fontSize: "0.75rem" }}>
-                  No junctions match the current filter.
+                  {t("traffic.noJunctionsMatch", "No junctions match the current filter.")}
                 </td>
               </tr>
             ) : (
@@ -397,7 +397,7 @@ export default function MonitoredJunctionsTable({
                     onMouseLeave={(e) => {
                       if (!isSel) e.currentTarget.style.background = "transparent";
                     }}
-                    title="Click to view intelligence and control options in the right panel"
+                    title={t("actions.clickToViewJunction", "Click to view junction details")}
                   >
                     {/* Junction Name & Subtitle */}
                     <td style={{ padding: "0.55rem 0.75rem" }}>

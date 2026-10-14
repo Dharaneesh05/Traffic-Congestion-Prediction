@@ -47,7 +47,7 @@ try:
     from track import Tracker
     from counter import VehicleCounter, LineConfig
     from traffic_analysis import TrafficAnalyser, AnalysisConfig
-    from config import CAMERAS, VIDEO_DIR
+    from config import CAMERAS, VIDEO_DIR, DATASET_DIR
     from redis_client import redis_client
     from database import SessionLocal, CameraModelDB, TrafficSnapshotModel, TrafficEventModel
 except (ImportError, ModuleNotFoundError):
@@ -55,7 +55,7 @@ except (ImportError, ModuleNotFoundError):
     from backend.track import Tracker
     from backend.counter import VehicleCounter, LineConfig
     from backend.traffic_analysis import TrafficAnalyser, AnalysisConfig
-    from backend.config import CAMERAS, VIDEO_DIR
+    from backend.config import CAMERAS, VIDEO_DIR, DATASET_DIR
     from backend.redis_client import redis_client
     from backend.database import SessionLocal, CameraModelDB, TrafficSnapshotModel, TrafficEventModel
 
@@ -213,25 +213,33 @@ class CameraWorker:
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
+    def _init_analysis_pipeline(self):
+        try:
+            if self.tracker is None:
+                self.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
+            if self.counter is None:
+                w = getattr(self, "frame_width", 1280) or 1280
+                h = getattr(self, "frame_height", 720) or 720
+                self.counter = VehicleCounter(
+                    lines=[LineConfig(name="L1", p1=(0.05, 0.5), p2=(0.95, 0.5), direction="both")],
+                    frame_w=w,
+                    frame_h=h
+                )
+            if self.analyser is None:
+                self.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0, history_len=100000))
+            print(f"[ANALYSIS] YOLO11 + ByteTrack analysis active for {self.model.camera_id}")
+        except Exception as e:
+            print(f"[ANALYSIS] Error initializing pipeline for {self.model.camera_id}: {e}")
+
     def start_analysis(self):
         """Enable live YOLO11 + ByteTrack vehicle detection and metrics tracking on camera frames."""
         print(f"[ANALYSIS] Starting YOLO11 + ByteTrack analysis for {self.model.camera_id}")
-        if self.tracker is None:
-            self.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
-        if self.counter is None:
-            w = getattr(self, "frame_width", 1280) or 1280
-            h = getattr(self, "frame_height", 720) or 720
-            self.counter = VehicleCounter(
-                lines=[LineConfig(name="L1", p1=(0.05, 0.5), p2=(0.95, 0.5), direction="both")],
-                frame_w=w,
-                frame_h=h
-            )
-        if self.analyser is None:
-            self.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0, history_len=100000))
-
         self.is_analyzing = True
         self.model.is_analyzing = True
-        print(f"[ANALYSIS] YOLO11 + ByteTrack analysis active for {self.model.camera_id}")
+        if self.tracker is None or self.counter is None or self.analyser is None:
+            threading.Thread(target=self._init_analysis_pipeline, daemon=True).start()
+        else:
+            print(f"[ANALYSIS] YOLO11 + ByteTrack analysis active for {self.model.camera_id}")
 
     def stop_analysis(self):
         """Stop live analysis while maintaining camera connection and streaming."""
@@ -260,18 +268,53 @@ class CameraWorker:
         self.is_analyzing = False
         self.model.is_analyzing = False
         self.model.status = "stopped"
+
+        # Wake up any threads waiting on raw frame
+        self._raw_frame_ready.set()
+
+        # Join capture thread first so no thread is inside cap.read() when cap is released
         if self._capture_thread and self._capture_thread.is_alive():
-            self._capture_thread.join(timeout=1.0)
+            if threading.current_thread() != self._capture_thread:
+                self._capture_thread.join(timeout=2.0)
+            self._capture_thread = None
+
         if self.cap:
             try:
                 self.cap.release()
             except Exception:
                 pass
             self.cap = None
+
+        time.sleep(0.1)
+
         self.latest_jpeg = None
         self.latest_telemetry = None
+        with self._frame_lock:
+            self._latest_raw_frame = None
+
+        self.latest_detections = {
+            "camera_id": self.model.camera_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "active_tracks": 0,
+            "detections": []
+        }
+        self.latest_metrics = {
+            "camera_id": self.model.camera_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": "stopped",
+            "fps": 0.0,
+            "active_vehicles": 0,
+            "total_tracked": 0,
+            "vehicles": {"car": 0, "truck": 0, "bus": 0, "bike": 0},
+            "vehicle_breakdown": {"car": 0, "truck": 0, "bus": 0, "bike": 0},
+            "total": 0,
+            "average_speed": None,
+            "congestion_score": 0
+        }
+
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2.0)
+            self.thread = None
 
     def _open_capture(self) -> Optional[cv2.VideoCapture]:
         stype = self.model.source_type.lower()
@@ -287,59 +330,120 @@ class CameraWorker:
             except (ValueError, TypeError):
                 device_idx = 0
             cap = cv2.VideoCapture(device_idx)
-        elif stype in ["ip", "rtsp"] or str(src).strip().lower().startswith(("rtsp://", "rtsps://")):
+        elif stype in ["ip", "rtsp"] or str(src).strip().lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
             src_str = str(src).strip()
             parsed = urlparse(src_str)
             host = parsed.hostname or "camera"
-            port = parsed.port or 554
+            port = parsed.port or (80 if parsed.scheme in ["http", "https"] else 554)
 
-            # Informational fast probe (non-fatal, never aborts before OpenCV)
-            try:
-                if parsed.hostname:
-                    with socket.create_connection((parsed.hostname, port), timeout=3.0):
-                        pass
-            except Exception as probe_err:
-                print(f"[RTSP] Fast probe notice for {host}:{port} ({probe_err}). Proceeding to direct OpenCV capture.")
-
-            # Attempt 1: TCP transport with 6.0s timeout and 1-frame buffer
-            print(f"[RTSP] Opening stream with TCP transport: {_mask_url(src_str)}")
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|stimeout;6000000|max_delay;500000"
+            # Strategy 1: UDP transport (Mobile camera apps stream RTP over UDP by default)
+            print(f"[RTSP] Connecting via UDP transport: {_mask_url(src_str)}")
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+                "rtsp_transport;udp|buffer_size;1048576|probesize;1048576|analyzeduration;1000000|fflags;nobuffer|flags;low_delay|threads;1"
+            )
             cap = cv2.VideoCapture(src_str, cv2.CAP_FFMPEG)
             if cap and cap.isOpened():
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                for _ in range(15):
-                    ret, test_frame = cap.read()
+                # Rapid poll for initial keyframe decoding from mobile camera over Wi-Fi
+                for _ in range(60):
+                    try:
+                        ret, test_frame = cap.read()
+                    except Exception:
+                        break
                     if ret and test_frame is not None and test_frame.size > 0:
                         with self._frame_lock:
                             self._latest_raw_frame = test_frame
                         self._raw_frame_ready.set()
+                        self.model.status = "online"
+                        self.model.error_message = None
+                        print(f"[RTSP] Connected via UDP in <1s. Resolution: {test_frame.shape[1]}x{test_frame.shape[0]}")
+                        return cap
+                    time.sleep(0.05)
+                print(f"[RTSP] UDP opened but waiting for keyframe timed out. Trying TCP...")
+                cap.release()
+                cap = None
+
+            # Strategy 2: TCP transport (For RTSP servers that mandate TCP interleaved transport)
+            print(f"[RTSP] Connecting via TCP transport: {_mask_url(src_str)}")
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+                "rtsp_transport;tcp|buffer_size;1048576|probesize;1048576|analyzeduration;1000000|fflags;nobuffer|flags;low_delay|threads;1"
+            )
+            cap = cv2.VideoCapture(src_str, cv2.CAP_FFMPEG)
+            if cap and cap.isOpened():
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                for _ in range(50):
+                    try:
+                        ret, test_frame = cap.read()
+                    except Exception:
+                        break
+                    if ret and test_frame is not None and test_frame.size > 0:
+                        with self._frame_lock:
+                            self._latest_raw_frame = test_frame
+                        self._raw_frame_ready.set()
+                        self.model.status = "online"
+                        self.model.error_message = None
                         print(f"[RTSP] Connected via TCP. Resolution: {test_frame.shape[1]}x{test_frame.shape[0]}")
                         return cap
-                    time.sleep(0.2)
-                print(f"[RTSP] TCP opened but no initial frame received. Retrying with UDP...")
+                    time.sleep(0.05)
+                print(f"[RTSP] TCP opened but waiting for keyframe timed out. Trying default auto...")
                 cap.release()
                 cap = None
 
-            # Attempt 2: Fallback to UDP transport if TCP failed to yield frames
-            print(f"[RTSP] Opening stream with UDP transport fallback: {_mask_url(src_str)}")
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp|stimeout;6000000|max_delay;500000"
+            # Strategy 3: Standard FFmpeg default auto-negotiation (matches VLC behavior)
+            print(f"[RTSP] Connecting with default FFmpeg options: {_mask_url(src_str)}")
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+                "buffer_size;1048576|probesize;1048576|analyzeduration;1000000|fflags;nobuffer|flags;low_delay|threads;1"
+            )
             cap = cv2.VideoCapture(src_str, cv2.CAP_FFMPEG)
             if cap and cap.isOpened():
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-                for _ in range(15):
-                    ret, test_frame = cap.read()
+                for _ in range(40):
+                    try:
+                        ret, test_frame = cap.read()
+                    except Exception:
+                        break
                     if ret and test_frame is not None and test_frame.size > 0:
                         with self._frame_lock:
                             self._latest_raw_frame = test_frame
                         self._raw_frame_ready.set()
-                        print(f"[RTSP] Connected via UDP. Resolution: {test_frame.shape[1]}x{test_frame.shape[0]}")
+                        self.model.status = "online"
+                        self.model.error_message = None
+                        print(f"[RTSP] Connected via default FFmpeg. Resolution: {test_frame.shape[1]}x{test_frame.shape[0]}")
                         return cap
-                    time.sleep(0.2)
+                    time.sleep(0.05)
                 cap.release()
                 cap = None
 
+            # Strategy 4: Direct capture for HTTP/MJPEG streams
+            if parsed.scheme in ["http", "https"]:
+                print(f"[HTTP] Connecting directly to stream: {_mask_url(src_str)}")
+                if "OPENCV_FFMPEG_CAPTURE_OPTIONS" in os.environ:
+                    del os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"]
+                cap = cv2.VideoCapture(src_str)
+                if cap and cap.isOpened():
+                    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+                    for _ in range(30):
+                        try:
+                            ret, test_frame = cap.read()
+                        except Exception:
+                            break
+                        if ret and test_frame is not None and test_frame.size > 0:
+                            with self._frame_lock:
+                                self._latest_raw_frame = test_frame
+                            self._raw_frame_ready.set()
+                            self.model.status = "online"
+                            self.model.error_message = None
+                            print(f"[HTTP] Connected. Resolution: {test_frame.shape[1]}x{test_frame.shape[0]}")
+                            return cap
+                        time.sleep(0.05)
+                    cap.release()
+                    cap = None
+
             self.model.status = "error"
-            self.model.error_message = f"Unable to receive video stream from {host}:{port}. Verify RTSP broadcast is active on the mobile device."
+            self.model.error_message = (
+                f"Unable to connect to RTSP stream at {host}:{port}. "
+                "Ensure your mobile broadcast is active, your PC is on the same network, and close VLC if running."
+            )
             return None
 
         elif stype in ["video", "uploaded_video"]:
@@ -369,24 +473,61 @@ class CameraWorker:
         return cap
 
     def _capture_loop(self):
-        """Dedicated high-frequency reader thread to prevent RTSP buffer overflows and packet loss."""
+        """Dedicated high-frequency reader thread to prevent RTSP buffer overflows and packet loss with auto-reconnect."""
         consecutive_errors = 0
+        reconnect_attempts = 0
         while not self.stop_event.is_set():
             if not self.cap or not self.cap.isOpened():
+                if not self.stop_event.is_set() and reconnect_attempts < 5:
+                    reconnect_attempts += 1
+                    print(f"[RTSP] Reconnecting lost stream (attempt {reconnect_attempts}/5)...")
+                    time.sleep(0.5)
+                    self.cap = self._open_capture()
+                    if self.cap and self.cap.isOpened():
+                        consecutive_errors = 0
+                        reconnect_attempts = 0
+                        self.model.status = "online"
+                        self.model.error_message = None
+                        continue
                 break
 
-            ret, frame = self.cap.read()
+            try:
+                ret, frame = self.cap.read()
+            except Exception:
+                ret = False
+                frame = None
+
             if not ret or frame is None or frame.size == 0:
                 consecutive_errors += 1
-                if consecutive_errors >= 40:
-                    print(f"[RTSP] Stream disconnected after repeated read failures.")
-                    self.model.status = "disconnected"
-                    self.model.error_message = "Camera stream disconnected"
-                    break
+                # Tolerate momentary Wi-Fi hiccups up to 10s (200 * 0.05s) before auto-reconnecting
+                if consecutive_errors >= 200:
+                    if reconnect_attempts < 5 and not self.stop_event.is_set():
+                        reconnect_attempts += 1
+                        print(f"[RTSP] Stream stutter detected. Auto-reconnecting (attempt {reconnect_attempts}/5)...")
+                        if self.cap:
+                            try:
+                                self.cap.release()
+                            except Exception:
+                                pass
+                            self.cap = None
+                        time.sleep(0.4)
+                        self.cap = self._open_capture()
+                        if self.cap and self.cap.isOpened():
+                            consecutive_errors = 0
+                            reconnect_attempts = 0
+                            self.model.status = "online"
+                            self.model.error_message = None
+                            continue
+                    else:
+                        print(f"[RTSP] Stream disconnected after repeated failures.")
+                        self.model.status = "disconnected"
+                        self.model.error_message = "Camera stream disconnected"
+                        break
                 time.sleep(0.05)
                 continue
 
             consecutive_errors = 0
+            reconnect_attempts = 0
             with self._frame_lock:
                 self._latest_raw_frame = frame
             self._raw_frame_ready.set()
@@ -417,6 +558,8 @@ class CameraWorker:
                     self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or (self._latest_raw_frame.shape[0] if self._latest_raw_frame is not None else 720)
                     self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
                     self._capture_thread.start()
+                    self.model.status = "online"
+                    self.model.error_message = None
                 else:
                     ret, first_frame = self.cap.read()
                     if not ret or first_frame is None or first_frame.size == 0:
@@ -428,19 +571,26 @@ class CameraWorker:
                         self._latest_raw_frame = first_frame
                     self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)) or first_frame.shape[1] or 1280
                     self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) or first_frame.shape[0] or 720
+                    self.model.status = "online"
+                    self.model.error_message = None
             else:
                 self.frame_width = 640
                 self.frame_height = 480
+                self.model.status = "online"
+                self.model.error_message = None
 
-            # If analysis should be active, instantiate pipeline
+            # If analysis should be active, ensure pipeline instances exist
             if self.is_analyzing:
-                self.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
-                self.counter = VehicleCounter(
-                    lines=[LineConfig(name="L1", p1=(0.05, 0.5), p2=(0.95, 0.5), direction="both")],
-                    frame_w=self.frame_width,
-                    frame_h=self.frame_height
-                )
-                self.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0, history_len=100000))
+                if self.tracker is None:
+                    self.tracker = Tracker(weights="yolo11n.pt", conf=0.25, tracker_config="bytetrack.yaml").load()
+                if self.counter is None:
+                    self.counter = VehicleCounter(
+                        lines=[LineConfig(name="L1", p1=(0.05, 0.5), p2=(0.95, 0.5), direction="both")],
+                        frame_w=self.frame_width,
+                        frame_h=self.frame_height
+                    )
+                if self.analyser is None:
+                    self.analyser = TrafficAnalyser(AnalysisConfig(fps=30.0, history_len=100000))
                 print(f"[YOLO11] Analysis started for {self.model.camera_id}")
                 print(f"[BYTETRACK] Tracking started for {self.model.camera_id}")
 
@@ -1189,6 +1339,9 @@ class CameraRegistry:
                     del self._workers[cid]
                 if camera_id in self._workers:
                     del self._workers[camera_id]
+            if model:
+                model.status = "stopped"
+                model.is_analyzing = False
 
     def get(self, camera_id: str) -> Optional[CameraModel]:
         return self.get_by_id(camera_id)
@@ -1218,29 +1371,78 @@ class CameraRegistry:
 
         # If custom video or source passed, update model and restart worker cleanly
         if video:
-            v_path = Path(video) if Path(video).is_absolute() else (VIDEO_DIR / video)
-            if v_path.exists():
+            v_name = Path(str(video)).name
+            candidate_paths = [
+                VIDEO_DIR / v_name,
+                Path(str(video)),
+                DATASET_DIR / str(video),
+            ]
+            chosen_path = None
+            for p in candidate_paths:
+                if p.exists() and p.is_file():
+                    chosen_path = p
+                    break
+            if chosen_path:
+                existing_worker = self.get_worker(camera_id)
+                if (
+                    existing_worker
+                    and existing_worker.thread
+                    and existing_worker.thread.is_alive()
+                    and str(model.source) == str(chosen_path)
+                    and model.status in ["online", "starting"]
+                ):
+                    if auto_analysis is not None:
+                        if auto_analysis:
+                            existing_worker.start_analysis()
+                        else:
+                            existing_worker.stop_analysis()
+                    return model
                 self.stop_worker(camera_id)
-                model.source = str(v_path)
+                model.source = str(chosen_path)
                 model.source_type = "video"
         elif source:
+            src_str = str(source).strip()
+            stype = (source_type or ("rtsp" if src_str.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")) else "video")).lower()
+            existing_worker = self.get_worker(camera_id)
+            if (
+                existing_worker
+                and existing_worker.thread
+                and existing_worker.thread.is_alive()
+                and str(model.source).strip() == src_str
+                and model.status in ["online", "starting"]
+            ):
+                if auto_analysis is not None:
+                    if auto_analysis:
+                        existing_worker.start_analysis()
+                    else:
+                        existing_worker.stop_analysis()
+                return model
             self.stop_worker(camera_id)
-            model.source = str(source).strip()
-            if source_type:
-                model.source_type = source_type.lower()
-            elif str(source).strip().lower().startswith(("rtsp://", "rtsps://")):
-                model.source_type = "rtsp"
+            model.source = src_str
+            model.source_type = stype
+
+        # Source state isolation: never process uploaded video and RTSP camera simultaneously
+        is_rtsp = model.source_type.lower() in ["ip", "rtsp"] or str(model.source).strip().lower().startswith(("rtsp://", "rtsps://", "http://", "https://"))
+        with self._lock:
+            for cid, w in list(self._workers.items()):
+                if cid == camera_id or (w.model and w.model.camera_id == camera_id):
+                    continue
+                if is_rtsp and w.model and w.model.source_type.lower() in ["video", "uploaded_video"]:
+                    w.stop()
+                    if cid in self._workers:
+                        del self._workers[cid]
+                elif not is_rtsp and w.model and (w.model.source_type.lower() in ["ip", "rtsp"] or str(w.model.source).strip().lower().startswith(("rtsp://", "rtsps://"))):
+                    w.stop()
+                    if cid in self._workers:
+                        del self._workers[cid]
 
         model.status = "starting"
         model.error_message = None
         worker = self.start_worker(camera_id, detector, predictor, route_planner=route_planner or self.route_planner)
 
-        # Configure initial analysis state: video defaults to True, IP/RTSP defaults to False
+        # Auto-enable analysis for all active streams so detections run automatically without manual start
         if auto_analysis is None:
-            if model.source_type.lower() in ["video", "uploaded_video"]:
-                auto_analysis = True
-            else:
-                auto_analysis = False
+            auto_analysis = True
 
         if auto_analysis:
             worker.start_analysis()

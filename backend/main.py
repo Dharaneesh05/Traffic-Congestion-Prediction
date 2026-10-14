@@ -39,6 +39,7 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
 
 # Ensure backend directory is in sys.path
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -556,10 +557,10 @@ async def websocket_camera_ingest(websocket: WebSocket, camera_id: str):
                     "speed": tel.get("average_speed_kmh", 0),
                     "congestion": tel.get("congestion_score", 0)
                 })
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, RuntimeError, ConnectionResetError, BrokenPipeError):
         pass
     except Exception as e:
-        print(f"[WebSocket Ingest Error {camera_id}]: {e}")
+        print(f"[WebSocket Ingest Notice {camera_id}]: {e}")
 
 
 # ── 1. /upload-video ──
@@ -1239,10 +1240,10 @@ async def start_camera_endpoint(camera_id: str, request: Request = None):
 
         if source:
             src_str = str(source).strip()
-            if source_type == "rtsp" or src_str.lower().startswith(("rtsp://", "rtsps://")):
+            if source_type in ["rtsp", "ip"] or src_str.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
                 source_type = "rtsp"
-                if not (src_str.lower().startswith("rtsp://") or src_str.lower().startswith("rtsps://")):
-                    raise HTTPException(status_code=400, detail="Invalid RTSP URL. Must begin with rtsp://")
+                if not src_str.lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
+                    raise HTTPException(status_code=400, detail="Invalid stream URL. Must begin with rtsp:// or http://")
 
         model = camera_registry.start_camera(
             camera_id,
@@ -1255,20 +1256,31 @@ async def start_camera_endpoint(camera_id: str, request: Request = None):
             auto_analysis=auto_analysis,
         )
 
-        # For network RTSP cameras, wait up to 8.0s for initial connection verification
-        if model.source_type.lower() in ["ip", "rtsp"]:
+        # For network RTSP / IP cameras, wait up to 20.0s for initial connection verification
+        if model.source_type.lower() in ["ip", "rtsp"] or str(model.source).strip().lower().startswith(("rtsp://", "rtsps://", "http://", "https://")):
             worker = camera_registry.get_worker(model.camera_id)
             t0 = time.time()
-            while time.time() - t0 < 8.0:
+            while time.time() - t0 < 20.0:
                 if model.status in ["online", "error"]:
                     break
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.15)
 
-            if model.status == "error":
+            if model.status != "online":
                 raise HTTPException(
                     status_code=400,
-                    detail=model.error_message or "Unable to connect to video feed"
+                    detail=model.error_message or "Unable to connect to RTSP camera stream. Verify mobile device is broadcasting."
                 )
+
+        # For video files, wait up to 2.5s for worker to initialize and read first frame
+        if model.source_type.lower() in ["video", "uploaded_video"]:
+            t0 = time.time()
+            while time.time() - t0 < 2.5:
+                worker = camera_registry.get_worker(model.camera_id)
+                if worker and worker.latest_jpeg is not None:
+                    break
+                if model.status in ["error", "disconnected"]:
+                    break
+                await asyncio.sleep(0.05)
 
         return {"message": f"Camera '{model.camera_id}' ({model.name}) started successfully.", "camera": model.to_dict()}
     except HTTPException:
@@ -1358,34 +1370,50 @@ async def stream_camera(camera_id: str):
     if not model:
         raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
 
-    worker = camera_registry.get_worker(model.camera_id)
-    if not worker or model.status not in ["starting", "online"]:
-        raise HTTPException(status_code=503, detail="Camera feed not running or unavailable.")
-
-    # Wait up to 3.0s for the first frame to become available if starting
+    # Wait up to 4.0s for worker and initial frame during startup / transition
     t_wait = 0.0
-    while worker.latest_jpeg is None and model.status in ["starting", "online"] and t_wait < 3.0:
-        await asyncio.sleep(0.1)
-        t_wait += 0.1
+    worker = camera_registry.get_worker(model.camera_id)
+    while t_wait < 4.0:
+        worker = camera_registry.get_worker(model.camera_id)
+        if worker and model.status in ["starting", "online"] and worker.latest_jpeg is not None:
+            break
+        if model.status in ["error", "disconnected"]:
+            break
+        await asyncio.sleep(0.05)
+        t_wait += 0.05
+
+    if not worker or model.status not in ["starting", "online"]:
+        raise HTTPException(status_code=503, detail=model.error_message or "Camera feed not running or unavailable.")
 
     if worker.latest_jpeg is None and model.status in ["error", "disconnected"]:
         raise HTTPException(status_code=503, detail=model.error_message or "Camera feed unavailable.")
 
     async def _mjpeg_generator():
         consecutive_idle = 0
-        while model.status in ["starting", "online"] and worker is not None and not worker.stop_event.is_set():
-            jpeg_bytes = worker.latest_jpeg
-            if jpeg_bytes is not None:
-                consecutive_idle = 0
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
-                )
-            else:
-                consecutive_idle += 1
-                if consecutive_idle > 150:  # ~15 seconds without any frames
+        try:
+            while model.status in ["starting", "online"] and worker is not None and not worker.stop_event.is_set():
+                jpeg_bytes = worker.latest_jpeg
+                if jpeg_bytes is not None:
+                    consecutive_idle = 0
+                    try:
+                        yield (
+                            b"--frame\r\n"
+                            b"Content-Type: image/jpeg\r\n\r\n" + jpeg_bytes + b"\r\n"
+                        )
+                    except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+                        break
+                else:
+                    consecutive_idle += 1
+                    if consecutive_idle > 150:  # ~15 seconds without any frames
+                        break
+                try:
+                    await asyncio.sleep(0.033)
+                except asyncio.CancelledError:
                     break
-            await asyncio.sleep(0.033)
+        except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError, ConnectionAbortedError, GeneratorExit):
+            pass
+        except Exception:
+            pass
 
     return StreamingResponse(
         _mjpeg_generator(),

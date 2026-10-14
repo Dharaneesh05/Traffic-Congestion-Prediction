@@ -128,30 +128,30 @@ export default function Header({
 
     if (showLocations && categorizedResults.locations?.length > 0) {
       categorizedResults.locations.forEach((loc) => {
-        items.push({ item: loc, category: "location", typeLabel: "District", group: "LOCATIONS & DISTRICTS" });
+        items.push({ item: loc, category: "location", typeLabel: t("header.locations", "District"), group: t("header.groupLocations", "LOCATIONS & DISTRICTS") });
       });
     }
 
     if (showJunctions && categorizedResults.junctions?.length > 0) {
       categorizedResults.junctions.forEach((jnc) => {
-        items.push({ item: jnc, category: "junction", typeLabel: "Junction", group: "JUNCTIONS" });
+        items.push({ item: jnc, category: "junction", typeLabel: t("header.junctions", "Junction"), group: t("header.groupJunctions", "JUNCTIONS") });
       });
     }
 
     if (showRoads && categorizedResults.roads?.length > 0) {
       categorizedResults.roads.forEach((road) => {
-        items.push({ item: road, category: "road", typeLabel: "Road", group: "ROADS & HIGHWAYS" });
+        items.push({ item: road, category: "road", typeLabel: t("header.roads", "Road"), group: t("header.groupRoads", "ROADS & HIGHWAYS") });
       });
     }
 
     if (showCameras && categorizedResults.cameras?.length > 0) {
       categorizedResults.cameras.forEach((cam) => {
-        items.push({ item: cam, category: "camera", typeLabel: "Camera", group: "CAMERAS" });
+        items.push({ item: cam, category: "camera", typeLabel: t("header.cameras", "Camera"), group: t("header.groupCameras", "CAMERAS") });
       });
     }
 
     return items;
-  }, [categorizedResults, searchFilter]);
+  }, [categorizedResults, searchFilter, t]);
 
   const executeImmediateSearch = async (rawQuery) => {
     if (!rawQuery || !rawQuery.trim()) return;
@@ -280,7 +280,7 @@ export default function Header({
               lineHeight: 1.15,
             }}
           >
-            TRAFFIC CONTROL
+            {t("nav.trafficControl", "TRAFFIC CONTROL")}
           </span>
         </div>
       </div>
@@ -307,8 +307,8 @@ export default function Header({
             style={{
               display: "flex",
               alignItems: "center",
-              background: "var(--bg-surface-elevated, #252936)",
-              border: "1px solid var(--border-default, #3D3F4E)",
+              background: "var(--bg-input, #FFFFFF)",
+              border: "1px solid var(--border-default, #D8E0E8)",
               borderRadius: "9999px",
               padding: "0 0.95rem",
               height: "38px",
@@ -316,7 +316,7 @@ export default function Header({
               transition: "border-color 0.15s ease",
             }}
           >
-            <Search size={15} color="var(--text-secondary, #A7ACB8)" style={{ flexShrink: 0 }} />
+            <Search size={15} color="var(--text-muted, #8A97A5)" style={{ flexShrink: 0 }} />
             <input
               type="text"
               placeholder={t("header.searchPlaceholder", "Search junction, road, camera, or district...")}
@@ -330,12 +330,12 @@ export default function Header({
                 fontSize: "0.8125rem",
                 fontFamily: "var(--font-sans)",
                 width: "100%",
-                color: "var(--text-primary, #F4F5F7)",
+                color: "var(--text-primary, #162334)",
                 fontWeight: 500,
               }}
             />
             {isSearching && (
-              <span style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)", flexShrink: 0 }}>...</span>
+              <span style={{ fontSize: "0.6875rem", color: "var(--text-muted, #8A97A5)", flexShrink: 0 }}>...</span>
             )}
 
             {searchQuery && (
@@ -350,15 +350,15 @@ export default function Header({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "var(--text-muted, #737987)",
+                  color: "var(--text-muted, #8A97A5)",
                   borderRadius: "50%",
                   flexShrink: 0,
                   lineHeight: 1,
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary, #F4F5F7)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted, #737987)")}
-                aria-label="Clear search"
-                title="Clear search"
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary, #162334)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted, #8A97A5)")}
+                aria-label={t("header.clearSearch", "Clear search")}
+                title={t("header.clearSearch", "Clear search")}
               >
                 <X size={14} strokeWidth={2.5} />
               </button>
@@ -374,10 +374,10 @@ export default function Header({
                 left: 0,
                 right: 0,
                 marginTop: "0.25rem",
-                background: "var(--bg-surface, #1B2028)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-card, #FFFFFF)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
-                boxShadow: "var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.45))",
+                boxShadow: "var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.25))",
                 zIndex: 100,
                 maxHeight: "340px",
                 overflowY: "auto",
@@ -396,10 +396,10 @@ export default function Header({
                             padding: "0.3rem 0.625rem",
                             fontSize: "0.5625rem",
                             fontWeight: 800,
-                            color: "var(--text-muted, #737987)",
-                            background: "var(--bg-surface-elevated, #252936)",
-                            borderBottom: "1px solid var(--border-default, #3D3F4E)",
-                            borderTop: idx > 0 ? "1px solid var(--border-default, #3D3F4E)" : "none",
+                            color: "var(--text-muted, #8A97A5)",
+                            background: "var(--bg-card-subtle, #F8FAFC)",
+                            borderBottom: "1px solid var(--border-default, #D8E0E8)",
+                            borderTop: idx > 0 ? "1px solid var(--border-default, #D8E0E8)" : "none",
                             textTransform: "uppercase",
                             letterSpacing: "0.04em",
                           }}
@@ -413,28 +413,28 @@ export default function Header({
                         style={{
                           padding: "0.45rem 0.75rem",
                           fontSize: "0.75rem",
-                          color: "var(--text-primary, #F4F5F7)",
+                          color: "var(--text-primary, #162334)",
                           cursor: "pointer",
-                          background: isHighlighted ? "var(--bg-surface-elevated, #252936)" : "transparent",
+                          background: isHighlighted ? "var(--bg-card-hover, #EEF2F6)" : "transparent",
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
-                          borderBottom: "1px solid var(--border-light, #2C303C)",
+                          borderBottom: "1px solid var(--border-light, #E7ECF1)",
                         }}
                       >
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ fontWeight: 700 }}>
-                            {entry.item.name || entry.item.id}
+                            {tJunction(entry.item.name || entry.item.id)}
                           </span>
-                          <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)" }}>
-                            {entry.item.district || entry.item.area || entry.item.approach || entry.typeLabel}
+                          <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #8A97A5)" }}>
+                            {tJunction(entry.item.district || entry.item.area || entry.item.approach) || entry.typeLabel}
                           </span>
                         </div>
                         <span
                           style={{
                             fontSize: "0.625rem",
                             fontWeight: 700,
-                            color: "var(--accent-soft-blue, #7B8BC8)",
+                            color: "var(--accent, #245B86)",
                             textTransform: "uppercase",
                             letterSpacing: "0.04em",
                           }}
@@ -446,8 +446,10 @@ export default function Header({
                   );
                 })
               ) : (
-                <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-muted, #737987)", fontSize: "0.75rem" }}>
-                  No matching results in {FILTER_LABELS[searchFilter] || "All"}
+                <div style={{ padding: "1rem", textAlign: "center", color: "var(--text-muted, #8A97A5)", fontSize: "0.75rem" }}>
+                  {t("header.noResults", "No matching results in {category}", {
+                    category: searchFilter === "all" ? t("header.allCategories", "All Categories") : (t(`header.${searchFilter}`, FILTER_LABELS[searchFilter] || searchFilter))
+                  })}
                 </div>
               )}
             </div>
@@ -462,7 +464,7 @@ export default function Header({
             style={{
               height: "38px",
               width: "38px",
-              background: isFilterOpen || searchFilter !== "all" ? "var(--bg-surface-elevated, #252936)" : "transparent",
+              background: isFilterOpen || searchFilter !== "all" ? "var(--bg-surface-secondary, #26333E)" : "transparent",
               border: "none",
               borderRadius: "4px",
               display: "flex",
@@ -471,10 +473,10 @@ export default function Header({
               cursor: "pointer",
               transition: "all 0.15s ease",
             }}
-            title="Filter search"
-            aria-label="Filter search categories"
+            title={t("header.filterCategory", "Filter search")}
+            aria-label={t("header.filterCategory", "Filter search categories")}
           >
-            <Filter size={16} color={searchFilter !== "all" ? "var(--accent-soft-blue, #7B8BC8)" : "var(--text-secondary, #A7ACB8)"} />
+            <Filter size={16} color={searchFilter !== "all" ? "var(--accent, #245B86)" : "var(--text-muted, #8A97A5)"} />
           </button>
 
           {/* Compact Popover Dropdown for Categories */}
@@ -484,10 +486,10 @@ export default function Header({
                 position: "absolute",
                 top: "calc(100% + 5px)",
                 right: 0,
-                background: "var(--bg-surface, #1B2028)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-card, #FFFFFF)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
-                boxShadow: "var(--shadow-lg, 0 6px 18px rgba(0, 0, 0, 0.45))",
+                boxShadow: "var(--shadow-md, 0 6px 18px rgba(0, 0, 0, 0.2))",
                 padding: "4px 0",
                 minWidth: "150px",
                 zIndex: 110,
@@ -498,20 +500,20 @@ export default function Header({
                   padding: "4px 10px",
                   fontSize: "0.5625rem",
                   fontWeight: 800,
-                  color: "var(--text-muted, #737987)",
+                  color: "var(--text-muted, #8A97A5)",
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
-                  borderBottom: "1px solid var(--border-light, #2C303C)",
+                  borderBottom: "1px solid var(--border-light, #E7ECF1)",
                 }}
               >
-                Filter Category
+                {t("header.filterCategory", "Filter Category")}
               </div>
               {[
-                { id: "all", label: "All Categories" },
-                { id: "locations", label: "Locations" },
-                { id: "junctions", label: "Junctions" },
-                { id: "roads", label: "Roads" },
-                { id: "cameras", label: "Cameras" },
+                { id: "all", label: t("header.allCategories", "All Categories") },
+                { id: "locations", label: t("header.locations", "Locations") },
+                { id: "junctions", label: t("header.junctions", "Junctions") },
+                { id: "roads", label: t("header.roads", "Roads") },
+                { id: "cameras", label: t("header.cameras", "Cameras") },
               ].map((cat) => {
                 const isSelected = searchFilter === cat.id;
                 return (
@@ -526,22 +528,22 @@ export default function Header({
                     style={{
                       width: "100%",
                       padding: "6px 10px",
-                      background: isSelected ? "var(--bg-surface-elevated, #252936)" : "transparent",
+                      background: isSelected ? "var(--bg-card-subtle, #F8FAFC)" : "transparent",
                       border: "none",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
                       fontSize: "0.75rem",
                       fontWeight: isSelected ? 800 : 500,
-                      color: isSelected ? "var(--text-primary, #F4F5F7)" : "var(--text-secondary, #A7ACB8)",
+                      color: isSelected ? "var(--text-primary, #162334)" : "var(--text-secondary, #344256)",
                       cursor: "pointer",
                       textAlign: "left",
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface-secondary, #2C303C)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? "var(--bg-surface-elevated, #252936)" : "transparent")}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? "var(--bg-card-subtle, #F8FAFC)" : "transparent")}
                   >
                     <span>{cat.label}</span>
-                    {isSelected && <Check size={13} color="var(--accent-soft-blue, #7B8BC8)" strokeWidth={2.5} />}
+                    {isSelected && <Check size={13} color="var(--accent, #245B86)" strokeWidth={2.5} />}
                   </button>
                 );
               })}
@@ -571,23 +573,23 @@ export default function Header({
             transition: "all 0.15s ease",
           }}
           onMouseEnter={(e) => {
-            if (onRequestCurrentLocation) e.currentTarget.style.background = "var(--bg-surface-elevated, #252936)";
+            if (onRequestCurrentLocation) e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent";
           }}
-          title={onRequestCurrentLocation ? "Click to detect / refresh current location" : "Active Location"}
+          title={onRequestCurrentLocation ? t("header.detectLocation", "Click to detect / refresh current location") : t("header.activeLocation", "Active Location")}
         >
           <MapPin
             size={14}
-            color={selectedLocation?.isUnavailable ? "var(--text-muted, #737987)" : "var(--accent-soft-blue, #7B8BC8)"}
+            color={selectedLocation?.isUnavailable ? "var(--text-muted, #8A97A5)" : "var(--accent, #245B86)"}
             strokeWidth={2.4}
             style={{ flexShrink: 0 }}
           />
           <span
             style={{
               fontWeight: 700,
-              color: selectedLocation?.isUnavailable ? "var(--text-muted, #737987)" : "var(--text-primary, #F4F5F7)",
+              color: selectedLocation?.isUnavailable ? "var(--text-muted, #8A97A5)" : "var(--text-primary, #162334)",
               letterSpacing: "-0.01em",
             }}
           >
@@ -611,11 +613,11 @@ export default function Header({
               width: 7,
               height: 7,
               borderRadius: "50%",
-              background: isHealthy ? "var(--status-normal, #22C55E)" : "var(--status-critical, #F45E70)",
+              background: isHealthy ? "var(--status-normal, #4FA878)" : "var(--state-red, #EF4444)",
               display: "inline-block",
             }}
           />
-          <span style={{ color: isHealthy ? "var(--status-normal, #22C55E)" : "var(--status-critical, #F45E70)" }}>
+          <span style={{ color: isHealthy ? "var(--status-normal, #4FA878)" : "var(--state-red, #EF4444)" }}>
             {isHealthy ? t("common.operational", "Operational") : t("common.offline", "Offline")}
           </span>
         </div>
@@ -634,11 +636,11 @@ export default function Header({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: isLangOpen || isLangHovered ? "var(--bg-surface-elevated, #252936)" : "transparent",
+              background: isLangOpen || isLangHovered ? "var(--bg-card-hover, #EEF2F6)" : "transparent",
               border: "none",
               borderRadius: "4px",
               padding: "0.25rem 0.4rem",
-              color: "var(--text-primary, #F4F5F7)",
+              color: "var(--text-primary, #162334)",
               cursor: "pointer",
               lineHeight: 1,
               transition: "all 0.15s ease",
@@ -646,7 +648,7 @@ export default function Header({
             title="Select Language / மொழியைத் தேர்ந்தெடுக்கவும்"
             aria-label="Select Language"
           >
-            <Globe size={15} color={isLangOpen || isLangHovered ? "var(--text-primary, #F4F5F7)" : "var(--text-secondary, #A7ACB8)"} />
+            <Globe size={15} color={isLangOpen || isLangHovered ? "var(--text-primary, #162334)" : "var(--text-muted, #8A97A5)"} />
           </button>
 
           {/* Interactive Language Dropdown */}
@@ -656,14 +658,14 @@ export default function Header({
                 position: "absolute",
                 top: "calc(100% + 4px)",
                 right: 0,
-                background: "var(--bg-surface-elevated, #252936)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-card, #FFFFFF)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
                 padding: "3px",
                 display: "flex",
                 flexDirection: "column",
                 gap: "2px",
-                boxShadow: "0 6px 18px rgba(0, 0, 0, 0.45)",
+                boxShadow: "var(--shadow-md, 0 6px 18px rgba(0, 0, 0, 0.2))",
                 zIndex: 150,
                 minWidth: "105px",
               }}
@@ -688,8 +690,8 @@ export default function Header({
                       justifyContent: "space-between",
                       gap: "0.5rem",
                       padding: "0.35rem 0.55rem",
-                      background: active ? "var(--bg-surface-secondary, #2C303C)" : "transparent",
-                      color: active ? "var(--accent-soft-blue, #7B8BC8)" : "var(--text-primary, #F4F5F7)",
+                      background: active ? "var(--bg-card-subtle, #F8FAFC)" : "transparent",
+                      color: active ? "var(--accent, #245B86)" : "var(--text-primary, #162334)",
                       border: "none",
                       borderRadius: "3px",
                       fontSize: "0.75rem",
@@ -699,14 +701,14 @@ export default function Header({
                       transition: "all 0.12s ease",
                     }}
                     onMouseEnter={(e) => {
-                      if (!active) e.currentTarget.style.background = "var(--bg-card-hover, #2C303C)";
+                      if (!active) e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)";
                     }}
                     onMouseLeave={(e) => {
                       if (!active) e.currentTarget.style.background = "transparent";
                     }}
                   >
                     <span>{lang.label}</span>
-                    {active && <Check size={12} color="var(--accent-soft-blue, #7B8BC8)" strokeWidth={2.5} />}
+                    {active && <Check size={12} color="var(--accent, #245B86)" strokeWidth={2.5} />}
                   </button>
                 );
               })}
@@ -726,14 +728,14 @@ export default function Header({
             border: "none",
             borderRadius: "4px",
             padding: "0.2rem 0.4rem",
-            color: "var(--text-primary, #F4F5F7)",
+            color: "var(--text-primary, #162334)",
             cursor: "pointer",
             lineHeight: 1,
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface-elevated, #252936)")}
+          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-          title={`Switch theme (${settings.theme === "dark" ? "Light Mode" : "Dark Mode"})`}
+          title={`${t("header.switchTheme", "Switch theme")} (${settings.theme === "dark" ? t("header.lightMode", "Light Mode") : t("header.darkMode", "Dark Mode")})`}
         >
           {settings.theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
         </button>
@@ -743,7 +745,7 @@ export default function Header({
           style={{
             fontSize: "0.9375rem",
             fontWeight: 700,
-            color: "var(--text-primary, #F4F5F7)",
+            color: "var(--text-primary, #162334)",
             fontFamily: "var(--font-sans)",
             display: "flex",
             alignItems: "center",

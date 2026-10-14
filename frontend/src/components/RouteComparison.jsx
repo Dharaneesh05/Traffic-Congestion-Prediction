@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { getRiskLevel } from "../services/tamilNaduTrafficData";
 import { trafficService } from "../services/trafficService";
+import { useSettings } from "../context/SettingsContext";
 
 function getHaversineDistKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
@@ -120,10 +121,21 @@ export default function RouteComparison({
   fromLocation = "",
   toLocation = "",
 }) {
-  // All Hooks MUST be called unconditionally at top level
+  const { t, tJunction } = useSettings();
   const [hoveredJunction, setHoveredJunction] = useState(null); // jnc id or name for congested tag tooltip
   const [hoveredIncident, setHoveredIncident] = useState(false); // incident indicator tooltip
   const [routeListOpen, setRouteListOpen] = useState(false); // ON ROUTE toggle
+
+  const localizeCondition = (cond) => {
+    if (!cond) return "";
+    const lower = cond.toLowerCase();
+    if (lower.includes("heavy congestion")) return t("status.heavyCongestion", "Heavy Congestion");
+    if (lower.includes("heavy delay")) return t("traffic.heavyDelay", "Heavy Delay");
+    if (lower.includes("moderate delay")) return cond;
+    if (lower.includes("moderate")) return t("traffic.moderateTraffic", "Moderate Traffic");
+    if (lower.includes("free flow")) return t("traffic.freeFlow", "Free Flow");
+    return cond;
+  };
 
   // Statewide junctions deduplicated list
   const allStatewideJunctions = useMemo(() => {
@@ -255,7 +267,9 @@ export default function RouteComparison({
 
   // Alternative route contextual reason (uses real congested junction names)
   const altReason = hasAlternative && congestedJunctions.length > 0
-    ? `Available to avoid congestion near ${congestedJunctions[0].name.replace(/ Junction$/, "")}.`
+    ? t("routes.altReasonAvoidCongestion", "Available to avoid congestion near {location}.", {
+        location: tJunction(congestedJunctions[0].name.replace(/ Junction$/, "")),
+      })
     : null;
 
   // Handle junction click: zoom map + select junction
@@ -283,11 +297,11 @@ export default function RouteComparison({
       {/* Route Origin → Destination summary */}
       <div style={{ display: "flex", alignItems: "baseline", gap: "4px", flexWrap: "wrap" }}>
         <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>
-          {originName}
+          {tJunction(originName)}
         </span>
-        <span style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)" }}>to</span>
+        <span style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)" }}>{t("routes.to", "to")}</span>
         <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>
-          {destName}
+          {tJunction(destName)}
         </span>
       </div>
 
@@ -311,12 +325,12 @@ export default function RouteComparison({
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--accent-soft-blue, #7B8BC8)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-              RECOMMENDED{isRecActive ? " · ACTIVE" : ""}
+              {t("routes.recommended", "RECOMMENDED")}{isRecActive ? ` · ${t("routes.active", "ACTIVE")}` : ""}
             </span>
           </div>
 
           <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-primary, #F4F5F7)" }}>
-            {recData?.name || "Main Highway Corridor"}
+            {tJunction(recData?.name || "Main Highway Corridor")}
           </div>
 
           {/* Metrics row: wraps cleanly without breaking values into two lines */}
@@ -333,13 +347,13 @@ export default function RouteComparison({
             }}
           >
             <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-              Distance: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{recDist} km</strong>
+              {t("routes.distance", "Distance")}: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{recDist} {t("common.km", "km")}</strong>
             </span>
             <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-              Travel time: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{recEta} min</strong>
+              {t("routes.travelTime", "Travel time")}: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{recEta} {t("common.min", "min")}</strong>
             </span>
             <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-              Traffic: <strong style={{ color: trafficConditionColor(recCondition) }}>{recCondition}</strong>
+              {t("routes.traffic", "Traffic")}: <strong style={{ color: trafficConditionColor(recCondition) }}>{localizeCondition(recCondition)}</strong>
             </span>
           </div>
 
@@ -347,11 +361,12 @@ export default function RouteComparison({
           {isRecActive && congestedJunctions.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "4px", alignItems: "center" }}>
               <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", fontWeight: 600 }}>
-                Traffic issues:
+                {t("routes.trafficIssues", "Traffic issues:")}
               </span>
               {congestedJunctions.map((jnc) => {
                 const isHovered = hoveredJunction === (jnc.id || jnc.name);
                 const sColor = statusColor(jnc);
+                const sLabel = statusLabel(jnc);
                 return (
                   <div
                     key={jnc.id || jnc.name}
@@ -370,7 +385,7 @@ export default function RouteComparison({
                         paddingBottom: "1px",
                       }}
                     >
-                      {jnc.name.replace(/ Junction$/, "")}
+                      {tJunction(jnc.name.replace(/ Junction$/, ""))}
                     </span>
 
                     {/* Junction hover tooltip */}
@@ -393,23 +408,23 @@ export default function RouteComparison({
                         }}
                       >
                         <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#F4F5F7", marginBottom: "0.15rem" }}>
-                          {jnc.name}
+                          {tJunction(jnc.name)}
                         </div>
                         <div style={{ fontSize: "0.625rem", fontWeight: 700, color: sColor, marginBottom: "0.2rem" }}>
-                          {statusLabel(jnc)}
+                          {t(`status.${sLabel.toLowerCase()}`, sLabel)}
                         </div>
                         {jnc.metrics?.vehicleCount != null && (
                           <div style={{ fontSize: "0.625rem", color: "#9299A8" }}>
-                            Vehicles: <span style={{ color: "#F4F5F7" }}>{jnc.metrics.vehicleCount}</span>
+                            {t("traffic.vehicles", "Vehicles")}: <span style={{ color: "#F4F5F7" }}>{jnc.metrics.vehicleCount}</span>
                           </div>
                         )}
                         {jnc.metrics?.averageSpeedKmh != null && (
                           <div style={{ fontSize: "0.625rem", color: "#9299A8" }}>
-                            Speed: <span style={{ color: "#F4F5F7" }}>{jnc.metrics.averageSpeedKmh} km/h</span>
+                            {t("traffic.averageSpeed", "Average Speed")}: <span style={{ color: "#F4F5F7" }}>{jnc.metrics.averageSpeedKmh} {t("common.kmh", "km/h")}</span>
                           </div>
                         )}
                         <div style={{ fontSize: "0.5625rem", color: "#7C8FD8", marginTop: "0.25rem" }}>
-                          Click to view on map
+                          {t("actions.clickToViewMap", "Click to view on map")}
                         </div>
                       </div>
                     )}
@@ -443,7 +458,10 @@ export default function RouteComparison({
                   borderBottom: "1px dotted #F59E0B",
                 }}
               >
-                {activeIncidents.length} incident{activeIncidents.length > 1 ? "s" : ""}
+                {t("routes.incidentsCount", `${activeIncidents.length} incident${activeIncidents.length > 1 ? "s" : ""}`, {
+                  count: activeIncidents.length,
+                  plural: activeIncidents.length > 1 ? "s" : "",
+                })}
               </span>
 
               {/* Incident hover tooltip */}
@@ -466,7 +484,7 @@ export default function RouteComparison({
                   }}
                 >
                   <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#F59E0B", marginBottom: "0.15rem" }}>
-                    {activeIncidents[0].junction || activeIncidents[0].location}
+                    {tJunction(activeIncidents[0].junction || activeIncidents[0].location)}
                   </div>
                   {activeIncidents[0].reason && (
                     <div style={{ fontSize: "0.625rem", color: "#C5C9D3", marginBottom: "0.15rem" }}>
@@ -475,11 +493,11 @@ export default function RouteComparison({
                   )}
                   {activeIncidents.length > 1 && (
                     <div style={{ fontSize: "0.5625rem", color: "#9299A8" }}>
-                      +{activeIncidents.length - 1} more along route
+                      +{activeIncidents.length - 1} {t("routes.moreAlongRoute", "more along route")}
                     </div>
                   )}
                   <div style={{ fontSize: "0.5625rem", color: "#7C8FD8", marginTop: "0.2rem" }}>
-                    Click to view junction
+                    {t("actions.clickToViewJunction", "Click to view junction")}
                   </div>
                 </div>
               )}
@@ -505,12 +523,12 @@ export default function RouteComparison({
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--status-normal, #22C55E)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                ALTERNATIVE{isAltActive ? " · ACTIVE" : ""}
+                {t("routes.alternative", "ALTERNATIVE")}{isAltActive ? ` · ${t("routes.active", "ACTIVE")}` : ""}
               </span>
             </div>
 
             <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-primary, #F4F5F7)" }}>
-              {altData?.name || "Bypass Arterial Corridor"}
+              {tJunction(altData?.name || "Bypass Arterial Corridor")}
             </div>
 
             {/* Metrics row */}
@@ -527,20 +545,20 @@ export default function RouteComparison({
               }}
             >
               <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Distance: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{altDist} km</strong>
+                {t("routes.distance", "Distance")}: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{altDist} {t("common.km", "km")}</strong>
               </span>
               <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Travel time: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{altEta} min</strong>
+                {t("routes.travelTime", "Travel time")}: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{altEta} {t("common.min", "min")}</strong>
               </span>
               <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Traffic: <strong style={{ color: trafficConditionColor(altCondition) }}>{altCondition}</strong>
+                {t("routes.traffic", "Traffic")}: <strong style={{ color: trafficConditionColor(altCondition) }}>{localizeCondition(altCondition)}</strong>
               </span>
             </div>
 
             {/* Delta vs recommended */}
             {recDist != null && altDist != null && recEta != null && altEta != null && (
               <div style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", marginTop: "2px" }}>
-                {(Number(altDist) - Number(recDist)) > 0 ? `+${(Number(altDist) - Number(recDist)).toFixed(1)} km` : ""}{(Number(altDist) - Number(recDist)) > 0 && (Number(altEta) - Number(recEta)) > 0 ? " · " : ""}{(Number(altEta) - Number(recEta)) > 0 ? `+${Number(altEta) - Number(recEta)} min` : ""}
+                {(Number(altDist) - Number(recDist)) > 0 ? `+${(Number(altDist) - Number(recDist)).toFixed(1)} ${t("common.km", "km")}` : ""}{(Number(altDist) - Number(recDist)) > 0 && (Number(altEta) - Number(recEta)) > 0 ? " · " : ""}{(Number(altEta) - Number(recEta)) > 0 ? `+${Number(altEta) - Number(recEta)} ${t("common.min", "min")}` : ""}
               </div>
             )}
 
@@ -571,12 +589,12 @@ export default function RouteComparison({
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--status-critical, #F45E70)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                CONGESTED{isCngActive ? " · ACTIVE" : ""}
+                {t("status.congested", "CONGESTED")}{isCngActive ? ` · ${t("routes.active", "ACTIVE")}` : ""}
               </span>
             </div>
 
             <div style={{ fontSize: "0.6875rem", fontWeight: 600, color: "var(--text-primary, #F4F5F7)" }}>
-              {cngData?.name || "City Arterial Corridor"}
+              {tJunction(cngData?.name || "City Arterial Corridor")}
             </div>
 
             {/* Metrics row */}
@@ -593,13 +611,13 @@ export default function RouteComparison({
               }}
             >
               <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Distance: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{cngDist} km</strong>
+                {t("routes.distance", "Distance")}: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{cngDist} {t("common.km", "km")}</strong>
               </span>
               <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Travel time: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{cngEta} min</strong>
+                {t("routes.travelTime", "Travel time")}: <strong style={{ color: "var(--text-primary, #F4F5F7)", fontFamily: "var(--font-mono)" }}>{cngEta} {t("common.min", "min")}</strong>
               </span>
               <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                Traffic: <strong style={{ color: "#FF5B6E" }}>{cngCondition}</strong>
+                {t("routes.traffic", "Traffic")}: <strong style={{ color: "#FF5B6E" }}>{localizeCondition(cngCondition)}</strong>
               </span>
             </div>
           </div>
@@ -632,7 +650,10 @@ export default function RouteComparison({
                 textTransform: "uppercase",
               }}
             >
-              ON ROUTE · {routeJunctions.length} LOCATION{routeJunctions.length !== 1 ? "S" : ""}
+              {t("routes.onRoute", "ON ROUTE")} · {t("routes.locationsCount", `${routeJunctions.length} LOCATION${routeJunctions.length !== 1 ? "S" : ""}`, {
+                count: routeJunctions.length,
+                plural: routeJunctions.length !== 1 ? "S" : "",
+              })}
             </span>
             <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--accent-soft-blue, #7B8BC8)" }}>
               {routeListOpen ? "▴" : "▾"}
@@ -671,10 +692,10 @@ export default function RouteComparison({
                     }}
                   >
                     <span style={{ fontSize: "0.75rem", color: "var(--text-primary, #F4F5F7)", fontWeight: 600 }}>
-                      {jnc.name}
+                      {tJunction(jnc.name)}
                     </span>
                     <span style={{ fontSize: "0.625rem", fontWeight: 800, color: sColor, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {sLabel}
+                      {t(`status.${sLabel.toLowerCase()}`, sLabel)}
                     </span>
                   </div>
                 );

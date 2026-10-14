@@ -49,6 +49,7 @@ export function SettingsProvider({ children }) {
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
+          workingMode: "control",
           mapLayers: {
             ...DEFAULT_SETTINGS.mapLayers,
             ...(parsed.mapLayers || {}),

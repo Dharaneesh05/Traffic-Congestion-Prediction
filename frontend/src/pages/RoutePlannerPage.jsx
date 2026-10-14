@@ -53,7 +53,7 @@ export default function RoutePlannerPage({
     return getMonitoredLocationsAlongRoute(activeWaypoints, allStatewideJunctions, 4.5);
   }, [activeWaypoints, allStatewideJunctions]);
 
-  const mapJunctions = routeJunctions.length > 0 ? routeJunctions : areaJunctions;
+  const mapJunctions = routeJunctions.length > 0 ? routeJunctions : allStatewideJunctions;
 
   return (
     <div

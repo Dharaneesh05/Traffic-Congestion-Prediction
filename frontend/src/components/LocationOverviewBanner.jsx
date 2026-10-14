@@ -1,5 +1,6 @@
 import React from "react";
 import { X } from "lucide-react";
+import { useSettings } from "../context/SettingsContext";
 
 export default function LocationOverviewBanner({
   overview,
@@ -7,13 +8,16 @@ export default function LocationOverviewBanner({
   junctions = [],
   onClose,
 }) {
+  const { t, tJunction } = useSettings();
   if (!overview && !districtName && (!junctions || junctions.length === 0)) return null;
 
-  let titlePrefix = "CURRENT LOCATION UNAVAILABLE";
+  let titlePrefix = t("common.locationUnavailable", "Current location unavailable").toUpperCase();
   if (districtName && districtName.toLowerCase() !== "tamil nadu") {
-    titlePrefix = districtName.toUpperCase();
+    titlePrefix = (tJunction ? tJunction(districtName) : districtName).toUpperCase();
   } else if (overview?.districtName) {
-    titlePrefix = overview.districtName.toUpperCase();
+    titlePrefix = (tJunction ? tJunction(overview.districtName) : overview.districtName).toUpperCase();
+  } else if (districtName) {
+    titlePrefix = (tJunction ? tJunction(districtName) : districtName).toUpperCase();
   }
 
   const majorCount = overview?.majorJunctionsCount ?? junctions.length ?? 0;
@@ -62,7 +66,7 @@ export default function LocationOverviewBanner({
             {majorCount}
           </span>
           <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-secondary, #C5CBD6)", letterSpacing: "0.01em" }}>
-            Junctions
+            {t("kpi.junctions", "Junctions")}
           </span>
         </div>
 
@@ -81,7 +85,7 @@ export default function LocationOverviewBanner({
             {onlineCams}
           </span>
           <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--text-secondary, #C5CBD6)", letterSpacing: "0.01em" }}>
-            Cameras Online
+            {t("kpi.camerasOnline", "Cameras Online")}
           </span>
         </div>
 
@@ -107,7 +111,7 @@ export default function LocationOverviewBanner({
               letterSpacing: "0.01em",
             }}
           >
-            Attention Required
+            {t("kpi.attentionRequired", "Attention Required")}
           </span>
         </div>
       </div>
@@ -127,7 +131,7 @@ export default function LocationOverviewBanner({
           }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary, #F4F5F7)")}
           onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted, #737987)")}
-          title="Dismiss Overview"
+          title={t("common.close", "Dismiss Overview")}
         >
           <X size={15} />
         </button>

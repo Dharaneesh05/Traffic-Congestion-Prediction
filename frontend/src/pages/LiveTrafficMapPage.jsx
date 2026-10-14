@@ -5,6 +5,7 @@ import { getStreamUrl, getCameraTelemetry } from "../api";
 import { TAMIL_NADU_LOCATIONS } from "../locations";
 import { trafficService } from "../services/trafficService";
 import { Layers, ChevronDown, Search, X } from "lucide-react";
+import { useSettings } from "../context/SettingsContext";
 
 export default function LiveTrafficMapPage({
   routeResult = null,
@@ -32,6 +33,7 @@ export default function LiveTrafficMapPage({
   onStopCamera,
   districtName = "Tamil Nadu",
 }) {
+  const { t, tJunction } = useSettings();
   const mapRef = useRef(null);
   const layerMenuRef = useRef(null);
 
@@ -496,9 +498,9 @@ export default function LiveTrafficMapPage({
               padding: "0 0.75rem",
               fontSize: "0.75rem",
               fontWeight: 700,
-              background: "var(--bg-surface-secondary, #252936)",
-              color: selectedJunction ? "#F4F5F7" : "var(--text-muted, #737987)",
-              border: "1px solid var(--border-default, #3D3F4E)",
+              background: "var(--bg-surface-secondary, #26333E)",
+              color: selectedJunction ? "var(--text-primary, #162334)" : "var(--text-muted, #8A97A5)",
+              border: "1px solid var(--border-default, #D8E0E8)",
               borderRadius: "4px",
               cursor: "pointer",
               display: "flex",
@@ -507,10 +509,10 @@ export default function LiveTrafficMapPage({
               transition: "all 0.15s ease",
             }}
           >
-            <span>{selectedJunction ? selectedJunction.name : "Select Junction"}</span>
+            <span>{selectedJunction ? tJunction(selectedJunction.name) : t("traffic.selectJunction", "Select Junction")}</span>
             <ChevronDown
               size={14}
-              color="#9299A8"
+              color="var(--text-muted, #8A97A5)"
               style={{
                 transform: showJunctionDropdown ? "rotate(180deg)" : "none",
                 transition: "transform 0.15s",
@@ -525,10 +527,10 @@ export default function LiveTrafficMapPage({
                 top: "calc(100% + 4px)",
                 left: 0,
                 width: "320px",
-                background: "var(--bg-surface, #1B2028)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-card, #FFFFFF)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
-                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.6)",
+                boxShadow: "var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.2))",
                 zIndex: 100,
                 display: "flex",
                 flexDirection: "column",
@@ -536,31 +538,31 @@ export default function LiveTrafficMapPage({
               }}
             >
               {/* Search Field */}
-              <div style={{ padding: "0.5rem", borderBottom: "1px solid var(--border-light, #2C303C)" }}>
+              <div style={{ padding: "0.5rem", borderBottom: "1px solid var(--border-light, #E7ECF1)" }}>
                 <div
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "0.4rem",
-                    background: "#161920",
-                    border: "1px solid #303746",
+                    background: "var(--bg-input, #FFFFFF)",
+                    border: "1px solid var(--border-default, #D8E0E8)",
                     borderRadius: "3px",
                     padding: "0.25rem 0.5rem",
                   }}
                 >
-                  <Search size={13} color="#9299A8" />
+                  <Search size={13} color="var(--text-muted, #8A97A5)" />
                   <input
                     type="text"
                     value={junctionSearchQuery}
                     onChange={(e) => setJunctionSearchQuery(e.target.value)}
-                    placeholder="Search junction or camera"
+                    placeholder={t("cctv.searchCamera", "Search junction or camera")}
                     autoFocus
                     style={{
                       flex: 1,
                       background: "transparent",
                       border: "none",
                       outline: "none",
-                      color: "#F4F5F7",
+                      color: "var(--text-primary, #162334)",
                       fontSize: "0.75rem",
                       fontFamily: "var(--font-sans)",
                     }}
@@ -569,7 +571,7 @@ export default function LiveTrafficMapPage({
                     <button
                       type="button"
                       onClick={() => setJunctionSearchQuery("")}
-                      style={{ background: "none", border: "none", color: "#9299A8", cursor: "pointer", padding: 0 }}
+                      style={{ background: "none", border: "none", color: "var(--text-muted, #8A97A5)", cursor: "padding", padding: 0 }}
                     >
                       <X size={12} />
                     </button>
@@ -592,8 +594,8 @@ export default function LiveTrafficMapPage({
                       <div
                         key={j.id || j.name}
                         style={{
-                          borderBottom: "1px solid var(--border-light, #2C303C)",
-                          background: isSelected ? "var(--bg-surface-elevated, #252936)" : "transparent",
+                          borderBottom: "1px solid var(--border-light, #E7ECF1)",
+                          background: isSelected ? "var(--bg-surface-secondary, #26333E)" : "transparent",
                         }}
                       >
                         <div
@@ -607,15 +609,21 @@ export default function LiveTrafficMapPage({
                             gap: "0.5rem",
                             transition: "background 0.1s",
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-surface-secondary, #222733)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? "var(--bg-surface-elevated, #252936)" : "transparent")}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = isSelected ? "var(--bg-surface-secondary, #26333E)" : "transparent")}
                         >
                           <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
-                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: isSelected ? "var(--accent-soft-blue, #7B8BC8)" : "#F4F5F7", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {j.name}
+                            <span style={{ fontSize: "0.75rem", fontWeight: 700, color: isSelected ? "var(--accent, #245B86)" : "var(--text-primary, #162334)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {tJunction(j.name)}
                             </span>
-                            <span style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)" }}>
-                              {camCount > 0 ? `${camCount} camera${camCount !== 1 ? "s" : ""} · ${liveCount} live` : "No cameras"}
+                            <span style={{ fontSize: "0.6875rem", color: "var(--text-muted, #8A97A5)" }}>
+                              {camCount > 0
+                                ? t("cctv.camerasCount", `${camCount} cameras · ${liveCount} live`, {
+                                    count: camCount,
+                                    plural: camCount !== 1 ? "s" : "",
+                                    live: liveCount,
+                                  })
+                                : t("cctv.noCameras", "No cameras")}
                             </span>
                           </div>
 
@@ -625,11 +633,11 @@ export default function LiveTrafficMapPage({
                                 style={{
                                   fontSize: "0.625rem",
                                   fontWeight: 800,
-                                  color: liveCount > 0 ? "#22C55E" : "#737987",
+                                  color: liveCount > 0 ? "var(--status-normal, #4FA878)" : "var(--text-muted, #8A97A5)",
                                   letterSpacing: "0.04em",
                                 }}
                               >
-                                {liveCount > 0 ? "LIVE" : "OFFLINE"}
+                                {liveCount > 0 ? t("status.live", "LIVE") : t("status.offline", "OFFLINE")}
                               </span>
                             </div>
                           )}
@@ -637,7 +645,7 @@ export default function LiveTrafficMapPage({
 
                         {/* Associated Cameras nested under junction */}
                         {cams.length > 0 && (
-                          <div style={{ padding: "0.15rem 0.65rem 0.4rem 1.25rem", display: "flex", flexDirection: "column", gap: "3px", background: "rgba(0,0,0,0.15)" }}>
+                          <div style={{ padding: "0.15rem 0.65rem 0.4rem 1.25rem", display: "flex", flexDirection: "column", gap: "3px", background: "var(--bg-card-subtle, #F8FAFC)" }}>
                             {cams.map((c) => {
                               const isCamActive = activeCameraId === c.id;
                               const isCamLive = c.status === "ONLINE" || c.status === "LIVE" || (isCamActive && cameraStatus === "online");
@@ -654,22 +662,22 @@ export default function LiveTrafficMapPage({
                                     padding: "2px 4px",
                                     borderRadius: "2px",
                                   }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
                                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                                 >
-                                  <span style={{ fontSize: "0.6875rem", color: isCamActive ? "var(--accent-soft-blue, #7B8BC8)" : "#A0A5B5" }}>
-                                    {c.approach || c.name || c.id}
+                                  <span style={{ fontSize: "0.6875rem", color: isCamActive ? "var(--accent, #245B86)" : "var(--text-secondary, #344256)" }}>
+                                    {tJunction(c.approach || c.name || c.id)}
                                   </span>
                                   <span
                                     style={{
                                       fontSize: "0.5625rem",
                                       fontWeight: 800,
-                                      color: isCamLive ? "#22C55E" : "#737987",
+                                      color: isCamLive ? "var(--status-normal, #4FA878)" : "var(--text-muted, #8A97A5)",
                                       padding: "1px 4px",
                                       borderRadius: "2px",
                                     }}
                                   >
-                                    {isCamLive ? "LIVE" : "OFFLINE"}
+                                    {isCamLive ? t("status.live", "LIVE") : t("status.offline", "OFFLINE")}
                                   </span>
                                 </div>
                               );
@@ -681,7 +689,7 @@ export default function LiveTrafficMapPage({
                   })
                 ) : (
                   <div style={{ padding: "1rem", textAlign: "center", color: "#737987", fontSize: "0.75rem" }}>
-                    No junctions found
+                    {t("traffic.noJunctionsMatch", "No junctions found")}
                   </div>
                 )}
               </div>
@@ -710,7 +718,7 @@ export default function LiveTrafficMapPage({
             gap: "0.35rem",
           }}
         >
-          <span>{isLocating ? "Locating..." : "Current Location"}</span>
+          <span>{isLocating ? t("common.detectingLocation", "Locating...") : t("common.currentLocation", "Current Location")}</span>
         </button>
 
         {/* 1c. Clear Button */}
@@ -730,7 +738,7 @@ export default function LiveTrafficMapPage({
             transition: "all 0.15s ease",
           }}
         >
-          Clear
+          {t("actions.clear", "Clear")}
         </button>
       </div>
 
@@ -787,7 +795,7 @@ export default function LiveTrafficMapPage({
             }}
           >
             <Layers size={13} color="var(--accent-soft-blue, #7B8BC8)" />
-            <span>Map Layers</span>
+            <span>{t("map.layers", "Map Layers")}</span>
           </button>
 
           {showLayerMenu && (
@@ -808,10 +816,10 @@ export default function LiveTrafficMapPage({
               }}
             >
               {[
-                { key: "junctions", label: "Junctions" },
-                { key: "cameras", label: "Cameras" },
-                { key: "incidents", label: "Incidents" },
-                { key: "routes", label: "Routes" },
+                { key: "junctions", label: t("map.layerJunctions", "Junctions") },
+                { key: "cameras", label: t("map.layerCameras", "Cameras") },
+                { key: "incidents", label: t("map.layerIncidents", "Incidents") },
+                { key: "routes", label: t("map.layerRoutes", "Routes") },
               ].map(({ key, label }) => (
                 <label
                   key={key}
@@ -856,13 +864,19 @@ export default function LiveTrafficMapPage({
             }}
           >
             <div style={{ fontWeight: 800, color: "var(--text-primary, #F4F5F7)", textTransform: "uppercase", marginBottom: "3px" }}>
-              ROUTE: {originInput || "ORIGIN"} → {destInput || "DESTINATION"}
+              {t("routes.routeSummary", "ROUTE: {origin} → {destination}", {
+                origin: tJunction(originInput || "ORIGIN"),
+                destination: tJunction(destInput || "DESTINATION"),
+              })}
             </div>
             {recDist != null && (
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ display: "inline-block", width: 14, height: 4, background: "var(--accent-soft-blue, #7B8BC8)", borderRadius: "1px" }}></span>
                 <span style={{ fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>
-                  RECOMMENDED: {recDist} km {recTime ? `· ${recTime} min` : ""}
+                  {t("routes.recommendedSummary", "RECOMMENDED: {dist} km · {time} min", {
+                    dist: recDist,
+                    time: recTime || "",
+                  })}
                 </span>
               </div>
             )}
@@ -870,7 +884,10 @@ export default function LiveTrafficMapPage({
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px" }}>
                 <span style={{ display: "inline-block", width: 14, height: 3, borderTop: "2px dashed var(--status-normal, #22C55E)" }}></span>
                 <span style={{ fontWeight: 700, color: "var(--status-normal, #22C55E)" }}>
-                  ALTERNATIVE: {altDist} km {altTime ? `· ${altTime} min` : ""}
+                  {t("routes.alternativeSummary", "ALTERNATIVE: {dist} km · {time} min", {
+                    dist: altDist,
+                    time: altTime || "",
+                  })}
                 </span>
               </div>
             )}
@@ -907,7 +924,7 @@ export default function LiveTrafficMapPage({
               }}
             >
               <div style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", letterSpacing: "0.02em" }}>
-                {jncData.name}
+                {tJunction(jncData.name)}
               </div>
               <button
                 type="button"
@@ -922,7 +939,7 @@ export default function LiveTrafficMapPage({
                   lineHeight: 1,
                   padding: "0 2px",
                 }}
-                title="Close Panel"
+                title={t("common.close", "Close Panel")}
               >
                 X
               </button>
@@ -933,7 +950,7 @@ export default function LiveTrafficMapPage({
               {/* Traffic Condition & CCTV Model Reading Status Badge */}
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: "0.8125rem", fontWeight: 900, color: jncData.sevColor, letterSpacing: "0.04em" }}>
-                  {jncData.statusLabel}
+                  {t(`status.${jncData.statusLabel.toLowerCase()}`, jncData.statusLabel)}
                 </div>
 
                 <div
@@ -949,7 +966,7 @@ export default function LiveTrafficMapPage({
                     textTransform: "uppercase",
                   }}
                 >
-                  {jncData.badgeLabel}
+                  {t(`status.${jncData.badgeLabel.toLowerCase()}`, jncData.badgeLabel)}
                 </div>
               </div>
 
@@ -958,7 +975,7 @@ export default function LiveTrafficMapPage({
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.5rem 0.35rem" }}>
                   <div>
                     <div style={{ fontSize: "0.625rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Vehicles
+                      {t("traffic.vehicles", "Vehicles")}
                     </div>
                     <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary, #F4F5F7)", marginTop: "1px" }}>
                       {liveCamTelemetry?.total_tracked ?? liveCamTelemetry?.vehicle_count ?? selectedJunction?.metrics?.vehicleCount ?? 0}
@@ -967,7 +984,7 @@ export default function LiveTrafficMapPage({
 
                   <div>
                     <div style={{ fontSize: "0.625rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Cars
+                      {t("traffic.cars", "Cars")}
                     </div>
                     <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary, #F4F5F7)", marginTop: "1px" }}>
                       {liveCamTelemetry?.cars ?? liveCamTelemetry?.vehicles?.car ?? Math.round((liveCamTelemetry?.total_tracked ?? selectedJunction?.metrics?.vehicleCount ?? 0) * 0.75)}
@@ -976,7 +993,7 @@ export default function LiveTrafficMapPage({
 
                   <div>
                     <div style={{ fontSize: "0.625rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Trucks
+                      {t("traffic.trucks", "Trucks")}
                     </div>
                     <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary, #F4F5F7)", marginTop: "1px" }}>
                       {liveCamTelemetry?.trucks ?? liveCamTelemetry?.vehicles?.truck ?? Math.round((liveCamTelemetry?.total_tracked ?? selectedJunction?.metrics?.vehicleCount ?? 0) * 0.15)}
@@ -985,7 +1002,7 @@ export default function LiveTrafficMapPage({
 
                   <div>
                     <div style={{ fontSize: "0.625rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Buses
+                      {t("traffic.buses", "Buses")}
                     </div>
                     <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary, #F4F5F7)", marginTop: "1px" }}>
                       {liveCamTelemetry?.buses ?? liveCamTelemetry?.vehicles?.bus ?? Math.round((liveCamTelemetry?.total_tracked ?? selectedJunction?.metrics?.vehicleCount ?? 0) * 0.05)}
@@ -994,7 +1011,7 @@ export default function LiveTrafficMapPage({
 
                   <div>
                     <div style={{ fontSize: "0.625rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Bikes
+                      {t("traffic.bikes", "Bikes")}
                     </div>
                     <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary, #F4F5F7)", marginTop: "1px" }}>
                       {liveCamTelemetry?.bikes ?? liveCamTelemetry?.vehicles?.bike ?? Math.round((liveCamTelemetry?.total_tracked ?? selectedJunction?.metrics?.vehicleCount ?? 0) * 0.05)}
@@ -1003,10 +1020,10 @@ export default function LiveTrafficMapPage({
 
                   <div>
                     <div style={{ fontSize: "0.625rem", color: "var(--text-secondary, #A0A5B5)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.03em" }}>
-                      Flow
+                      {t("traffic.flow", "Flow")}
                     </div>
                     <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-primary, #F4F5F7)", marginTop: "1px" }}>
-                      {`${Math.round(liveCamTelemetry?.flow_per_minute ?? liveCamTelemetry?.traffic_flow_vpm ?? selectedJunction?.metrics?.trafficFlowVpm ?? 0)}/min`}
+                      {`${Math.round(liveCamTelemetry?.flow_per_minute ?? liveCamTelemetry?.traffic_flow_vpm ?? selectedJunction?.metrics?.trafficFlowVpm ?? 0)}/${t("common.min", "min")}`}
                     </div>
                   </div>
                 </div>

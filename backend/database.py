@@ -19,10 +19,16 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 
+from dotenv import load_dotenv
+
 # Ensure backend directory is in sys.path
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
+
+# Load environment variables
+load_dotenv(os.path.join(_BACKEND_DIR, "..", ".env"))
+load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
 
 from config import VIDEO_DIR
 

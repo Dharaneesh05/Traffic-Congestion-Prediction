@@ -94,7 +94,7 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
                 {t("nav.trafficControl", "TRAFFIC CONTROL")}
               </span>
               <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #64748B)", fontWeight: 600 }}>
-                {t("settings.viewTamilNadu", "Tamil Nadu")} Operations
+                {t("nav.stateOperations", "State Operations")}
               </span>
             </div>
           )}
@@ -133,19 +133,16 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
                     padding: isCollapsed ? "0" : "0.55rem 0.75rem",
                     borderRadius: "4px",
                     border: "none",
-                    borderLeft: !isCollapsed
-                      ? (isActive ? "3px solid var(--accent-soft-blue, #7B8BC8)" : "3px solid transparent")
-                      : "none",
                     background: isActive
-                      ? "var(--bg-surface-elevated, #252936)"
+                      ? "var(--accent-subtle, rgba(36, 91, 134, 0.08))"
                       : isHovered
-                      ? "var(--bg-card-hover, #2C303C)"
+                      ? "var(--bg-card-hover, #EEF2F6)"
                       : "transparent",
                     color: isActive
-                      ? "var(--accent-soft-blue, #7B8BC8)"
+                      ? "var(--accent, #245B86)"
                       : isHovered
-                      ? "var(--text-primary, #F4F5F7)"
-                      : "var(--text-secondary, #A7ACB8)",
+                      ? "var(--text-primary, #162334)"
+                      : "var(--text-secondary, #344256)",
                     fontWeight: isActive ? 600 : 500,
                     fontSize: "0.8125rem",
                     cursor: "pointer",
@@ -170,15 +167,15 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
                       left: "calc(100% + 12px)",
                       top: "50%",
                       transform: "translateY(-50%)",
-                      background: "var(--bg-surface-elevated, #252936)",
-                      border: "1px solid var(--border-default, #3D3F4E)",
-                      color: "var(--text-primary, #F4F5F7)",
+                      background: "var(--bg-card, #FFFFFF)",
+                      border: "1px solid var(--border-default, #D8E0E8)",
+                      color: "var(--text-primary, #162334)",
                       fontSize: "0.75rem",
                       fontWeight: 600,
                       padding: "0.35rem 0.7rem",
                       borderRadius: "4px",
                       whiteSpace: "nowrap",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+                      boxShadow: "var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15))",
                       zIndex: 300,
                       pointerEvents: "none",
                       letterSpacing: "0.02em",
@@ -196,9 +193,9 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
                         transform: "translateY(-50%) rotate(45deg)",
                         width: "8px",
                         height: "8px",
-                        background: "var(--bg-surface-elevated, #252936)",
-                        borderLeft: "1px solid var(--border-default, #3D3F4E)",
-                        borderBottom: "1px solid var(--border-default, #3D3F4E)",
+                        background: "var(--bg-card, #FFFFFF)",
+                        borderLeft: "1px solid var(--border-default, #D8E0E8)",
+                        borderBottom: "1px solid var(--border-default, #D8E0E8)",
                       }}
                     />
                   </div>
@@ -213,7 +210,7 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
       <div
         style={{
           padding: "0.875rem 0.625rem",
-          borderTop: "1px solid var(--border-light, #2C303C)",
+          borderTop: "1px solid var(--border-light, #E7ECF1)",
           display: "flex",
           justifyContent: isCollapsed ? "center" : "flex-end",
         }}
@@ -221,27 +218,27 @@ export default function Sidebar({ activeTab, setActiveTab, isCollapsed, setIsCol
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           style={{
-            background: "var(--bg-surface-secondary, #252936)",
-            border: "1px solid var(--border-default, #3D3F4E)",
+            background: "var(--bg-surface-secondary, #26333E)",
+            border: "1px solid var(--border-default, #D8E0E8)",
             borderRadius: "4px",
             width: "28px",
             height: "28px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "var(--text-muted, #737987)",
+            color: "var(--text-muted, #8A97A5)",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--text-primary, #F4F5F7)";
-            e.currentTarget.style.background = "var(--bg-card-hover, #2C303C)";
+            e.currentTarget.style.color = "var(--text-primary, #162334)";
+            e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--text-muted, #737987)";
-            e.currentTarget.style.background = "var(--bg-surface-secondary, #252936)";
+            e.currentTarget.style.color = "var(--text-muted, #8A97A5)";
+            e.currentTarget.style.background = "var(--bg-surface-secondary, #26333E)";
           }}
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={isCollapsed ? t("sidebar.expand", "Expand sidebar") : t("sidebar.collapse", "Collapse sidebar")}
         >
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>

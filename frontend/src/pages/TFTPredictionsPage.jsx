@@ -156,6 +156,27 @@ export default function TFTPredictionsPage({
     };
   }, [forecast, selectedJunction, clockTimes]);
 
+  const getHorizonLabel = (key, defaultLabel) => {
+    switch (key) {
+      case "now":
+        return t("forecast.now", "NOW");
+      case "5min":
+        return t("forecast.min5", "+5 MIN");
+      case "15min":
+        return t("forecast.min15", "+15 MIN");
+      case "30min":
+        return t("forecast.min30", "+30 MIN");
+      default:
+        return defaultLabel;
+    }
+  };
+
+  const getLocalizedSeverity = (level) => {
+    if (!level) return "";
+    const key = `status.${level.toLowerCase()}`;
+    return t(key, level);
+  };
+
   // 3. Dynamic Warning & Header Status
   const warningInfo = useMemo(() => {
     const hasAmbulance = (alerts || []).some(
@@ -167,13 +188,13 @@ export default function TFTPredictionsPage({
     );
     if (hasAmbulance) {
       return {
-        headerStatus: "EMERGENCY",
+        headerStatus: t("forecast.emergency", "EMERGENCY"),
         headerColor: "var(--status-critical, #EF4444)",
-        warningTitle: "EMERGENCY",
+        warningTitle: t("forecast.emergency", "EMERGENCY"),
         warningColor: "var(--status-critical, #EF4444)",
-        mainText: `Ambulance approaching ${locationName}.`,
-        subText: "Priority corridor clearance active on approach.",
-        buttonText: "VIEW LOCATION",
+        mainText: t("forecast.ambulanceApproaching", "Ambulance approaching {location}.", { location: locationName }),
+        subText: t("forecast.priorityClearance", "Priority corridor clearance active on approach."),
+        buttonText: t("actions.viewLocation", "VIEW LOCATION"),
         buttonAction: "map",
       };
     }
@@ -187,13 +208,13 @@ export default function TFTPredictionsPage({
     );
     if (hasAccident) {
       return {
-        headerStatus: "INCIDENT: ACCIDENT",
+        headerStatus: t("forecast.incidentAccident", "INCIDENT: ACCIDENT"),
         headerColor: "var(--status-critical, #EF4444)",
-        warningTitle: "TRAFFIC INCIDENT",
+        warningTitle: t("cctv.trafficIncident", "TRAFFIC INCIDENT"),
         warningColor: "var(--status-critical, #EF4444)",
-        mainText: `Accident reported near ${locationName}.`,
-        subText: "Traffic flow disrupted. Emergency response dispatched.",
-        buttonText: "VIEW CCTV",
+        mainText: t("forecast.accidentReported", "Accident reported near {location}.", { location: locationName }),
+        subText: t("forecast.trafficFlowDisrupted", "Traffic flow disrupted. Emergency response dispatched."),
+        buttonText: t("actions.viewCCTV", "VIEW CCTV"),
         buttonAction: "cctv",
       };
     }
@@ -207,9 +228,9 @@ export default function TFTPredictionsPage({
 
     if (curLevel === "CRITICAL" || f15Level === "CRITICAL" || f30Level === "CRITICAL") {
       return {
-        headerStatus: `WARNING: ${t("status.critical", "CRITICAL")}`,
+        headerStatus: t("forecast.warningStatus", "WARNING: {status}", { status: t("status.critical", "CRITICAL") }),
         headerColor: "var(--status-critical, #EF4444)",
-        warningTitle: t("cctv.trafficIncident", "TRAFFIC WARNING"),
+        warningTitle: t("forecast.trafficWarning", "TRAFFIC WARNING"),
         warningColor: "var(--status-critical, #EF4444)",
         mainText: t("forecast.criticalCongestion", "Critical congestion expected within 15 minutes."),
         subText: t("forecast.queueMayExtend", "Queue may extend toward {location}.", { location: localizedRoad }),
@@ -220,11 +241,11 @@ export default function TFTPredictionsPage({
 
     if (f15Level === "HIGH" || curLevel === "HIGH") {
       return {
-        headerStatus: `WARNING: ${t("status.high", "HEAVY CONGESTION")}`,
+        headerStatus: t("forecast.warningStatus", "WARNING: {status}", { status: t("status.high", "HEAVY CONGESTION") }),
         headerColor: "var(--status-high, #F59E0B)",
-        warningTitle: t("cctv.trafficIncident", "TRAFFIC WARNING"),
+        warningTitle: t("forecast.trafficWarning", "TRAFFIC WARNING"),
         warningColor: "var(--status-high, #F59E0B)",
-        mainText: t("forecast.highCongestionExpected", "High congestion expected within 15 minutes.", { minutes: 15 }),
+        mainText: t("forecast.highCongestion", "High congestion expected within 15 minutes."),
         subText: t("forecast.queueMayExtend", "Queue may extend toward {location}.", { location: localizedRoad }),
         buttonText: t("actions.viewLocation", "VIEW LOCATION"),
         buttonAction: "map",
@@ -233,11 +254,11 @@ export default function TFTPredictionsPage({
 
     if (f15Level === "MODERATE" || forecastHorizons.horizons[1].pct >= 35 || curLevel === "MODERATE") {
       return {
-        headerStatus: `WARNING: ${t("status.moderate", "CONGESTION")}`,
+        headerStatus: t("forecast.warningStatus", "WARNING: {status}", { status: t("status.moderate", "CONGESTION") }),
         headerColor: "var(--status-high, #F59E0B)",
-        warningTitle: t("cctv.trafficIncident", "TRAFFIC WARNING"),
+        warningTitle: t("forecast.trafficWarning", "TRAFFIC WARNING"),
         warningColor: "var(--status-high, #F59E0B)",
-        mainText: t("forecast.highCongestionExpected", "High congestion expected within 15 minutes.", { minutes: 15 }),
+        mainText: t("forecast.moderateCongestion", "Moderate congestion expected within 15 minutes."),
         subText: t("forecast.queueMayExtend", "Queue may extend toward {location}.", { location: localizedRoad }),
         buttonText: t("actions.viewLocation", "VIEW LOCATION"),
         buttonAction: "map",
@@ -245,9 +266,9 @@ export default function TFTPredictionsPage({
     }
 
     return {
-      headerStatus: `STATUS: ${t("status.normal", "NORMAL")}`,
+      headerStatus: t("forecast.statusTitle", "STATUS: {status}", { status: t("status.normal", "NORMAL") }),
       headerColor: "var(--status-normal, #22C55E)",
-      warningTitle: t("traffic.status", "TRAFFIC STATUS"),
+      warningTitle: t("forecast.status", "TRAFFIC STATUS"),
       warningColor: "var(--status-normal, #22C55E)",
       mainText: t("forecast.freeFlow", "Free flow traffic conditions observed."),
       subText: t("forecast.capacityNominal", "All approaches operating within nominal capacity."),
@@ -338,7 +359,17 @@ export default function TFTPredictionsPage({
       };
     });
 
-    const pathD = pts.reduce((acc, pt, i) => `${acc} ${i === 0 ? "M" : "L"} ${pt.x} ${pt.y.toFixed(1)}`, "");
+    // Smooth cubic bezier curve for high-end chart aesthetics
+    let pathD = "";
+    if (pts.length > 0) {
+      pathD = `M ${pts[0].x} ${pts[0].y.toFixed(1)}`;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+        const mx = (p0.x + p1.x) / 2;
+        pathD += ` C ${mx} ${p0.y.toFixed(1)}, ${mx} ${p1.y.toFixed(1)}, ${p1.x} ${p1.y.toFixed(1)}`;
+      }
+    }
     const areaD = `${pathD} L ${pts[pts.length - 1].x} 150 L ${pts[0].x} 150 Z`;
     return { pts, pathD, areaD };
   }, [forecastHorizons, currentMetrics]);
@@ -474,13 +505,13 @@ export default function TFTPredictionsPage({
           style={{
             fontSize: "0.75rem",
             fontWeight: 800,
-            color: "var(--accent-soft-blue, #60A5FA)",
+            color: "var(--accent, #245B86)",
             letterSpacing: "0.06em",
             textTransform: "uppercase",
             marginBottom: "0.4rem",
           }}
         >
-          TRAFFIC STATUS
+          {t("forecast.status", "TRAFFIC STATUS")}
         </div>
 
         <div
@@ -502,12 +533,13 @@ export default function TFTPredictionsPage({
                   gap: "2px",
                   padding: "0.25rem 0",
                   borderRadius: "4px",
-                  background: selectedHorizonKey === h.key ? "rgba(96, 165, 250, 0.06)" : "transparent",
+                  background: selectedHorizonKey === h.key ? "var(--bg-card-subtle, #F8FAFC)" : "transparent",
+                  border: selectedHorizonKey === h.key ? "1px solid var(--border-default, #D8E0E8)" : "1px solid transparent",
                   cursor: "pointer",
                   transition: "background 0.15s ease",
                 }}
                 onClick={() => setSelectedHorizonKey(h.key)}
-                title={`Click to focus ${h.label} forecast`}
+                title={`Click to focus ${getHorizonLabel(h.key, h.label)} forecast`}
               >
                 <span
                   style={{
@@ -518,15 +550,18 @@ export default function TFTPredictionsPage({
                     textTransform: "uppercase",
                   }}
                 >
-                  {h.label}
+                  {getHorizonLabel(h.key, h.label)}
                 </span>
 
                 <span
                   style={{
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    color: "var(--accent-soft-blue, #7B8BC8)",
+                    fontSize: "1.125rem",
+                    fontWeight: 900,
+                    color: "var(--accent, #245B86)",
                     fontFamily: "var(--font-mono, monospace)",
+                    letterSpacing: "-0.01em",
+                    lineHeight: 1.2,
+                    margin: "2px 0 1px 0",
                   }}
                 >
                   {h.clockTime}
@@ -554,7 +589,7 @@ export default function TFTPredictionsPage({
                     textTransform: "uppercase",
                   }}
                 >
-                  {h.level}
+                  {getLocalizedSeverity(h.level)}
                 </span>
               </div>
             );
@@ -591,7 +626,7 @@ export default function TFTPredictionsPage({
               marginBottom: "0.35rem",
             }}
           >
-            CURRENT TRAFFIC
+            {t("forecast.currentTraffic", "CURRENT TRAFFIC")}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
@@ -686,22 +721,22 @@ export default function TFTPredictionsPage({
                 height: "32px",
                 padding: "0 1rem",
                 fontSize: "0.6875rem",
-                fontWeight: 800,
+                fontWeight: 700,
                 letterSpacing: "0.04em",
-                background: "var(--bg-surface-elevated, #252936)",
-                color: "var(--accent-soft-blue, #7B8BC8)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-surface-secondary, #26333E)",
+                color: "var(--accent, #245B86)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "var(--accent-indigo, #3E4776)";
+                e.currentTarget.style.background = "var(--accent, #245B86)";
                 e.currentTarget.style.color = "#FFFFFF";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "var(--bg-surface-elevated, #252936)";
-                e.currentTarget.style.color = "var(--accent-soft-blue, #7B8BC8)";
+                e.currentTarget.style.background = "var(--bg-surface-secondary, #26333E)";
+                e.currentTarget.style.color = "var(--accent, #245B86)";
               }}
             >
               {warningInfo.buttonText}
@@ -733,7 +768,7 @@ export default function TFTPredictionsPage({
             style={{
               fontSize: "0.8125rem",
               fontWeight: 800,
-              color: "var(--accent-indigo, #A78BFA)",
+              color: "var(--accent, #245B86)",
               letterSpacing: "0.06em",
               textTransform: "uppercase",
             }}
@@ -746,10 +781,10 @@ export default function TFTPredictionsPage({
               display: "flex",
               alignItems: "center",
               gap: "2px",
-              background: "var(--bg-surface-elevated, #252936)",
-              border: "1px solid var(--border-default, #3D3F4E)",
-              borderRadius: "3px",
-              padding: "1px",
+              background: "var(--bg-surface-secondary, #26333E)",
+              border: "1px solid var(--border-default, #D8E0E8)",
+              borderRadius: "4px",
+              padding: "2px",
             }}
           >
             <button
@@ -758,30 +793,30 @@ export default function TFTPredictionsPage({
               style={{
                 padding: "3px 10px",
                 fontSize: "0.6875rem",
-                fontWeight: 800,
+                fontWeight: 700,
                 letterSpacing: "0.04em",
                 border: "none",
-                borderRadius: "2px",
-                background: trendView === "chart" ? "var(--accent-indigo, #3E4776)" : "transparent",
-                color: trendView === "chart" ? "#FFFFFF" : "var(--text-muted, #737987)",
+                borderRadius: "3px",
+                background: trendView === "chart" ? "var(--accent, #245B86)" : "transparent",
+                color: trendView === "chart" ? "#FFFFFF" : "var(--text-muted, #8A97A5)",
                 cursor: "pointer",
               }}
             >
               {t("forecast.chart", "CHART")}
             </button>
-            <span style={{ color: "var(--border-default, #3D3F4E)", fontSize: "10px" }}>|</span>
+            <span style={{ color: "var(--border-default, #D8E0E8)", fontSize: "10px" }}>|</span>
             <button
               type="button"
               onClick={() => setTrendView("table")}
               style={{
                 padding: "3px 10px",
                 fontSize: "0.6875rem",
-                fontWeight: 800,
+                fontWeight: 700,
                 letterSpacing: "0.04em",
                 border: "none",
-                borderRadius: "2px",
-                background: trendView === "table" ? "var(--accent-indigo, #3E4776)" : "transparent",
-                color: trendView === "table" ? "#FFFFFF" : "var(--text-muted, #737987)",
+                borderRadius: "3px",
+                background: trendView === "table" ? "var(--accent, #245B86)" : "transparent",
+                color: trendView === "table" ? "#FFFFFF" : "var(--text-muted, #8A97A5)",
                 cursor: "pointer",
               }}
             >
@@ -793,45 +828,48 @@ export default function TFTPredictionsPage({
         {trendView === "chart" ? (
           <div style={{ flex: 1, width: "100%", minHeight: "195px", position: "relative" }}>
             <svg
-              viewBox="0 0 800 200"
+              viewBox="0 0 800 205"
               preserveAspectRatio="none"
               style={{ width: "100%", height: "100%", minHeight: "195px", display: "block" }}
             >
-              <defs>
-                <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.32" />
-                  <stop offset="70%" stopColor="#3B82F6" stopOpacity="0.08" />
-                  <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.0" />
-                </linearGradient>
-              </defs>
-
               {/* Reference Gridlines with Y-Axis Percentage Labels */}
-              <g opacity="0.45">
-                <line x1="60" y1="30" x2="740" y2="30" stroke="#3D3F4E" strokeDasharray="3 3" />
-                <text x="50" y="34" textAnchor="end" fill="#9299A8" fontSize="10.5" fontWeight="600">100%</text>
+              <g opacity="0.85">
+                <line x1="60" y1="30" x2="740" y2="30" stroke="var(--border-light, #D8E0E8)" strokeDasharray="3 3" />
+                <text x="50" y="34" textAnchor="end" fill="var(--text-muted, #8A97A5)" fontSize="10.5" fontWeight="600">100%</text>
 
-                <line x1="60" y1="60" x2="740" y2="60" stroke="#2C303C" strokeDasharray="2 3" />
-                <text x="50" y="64" textAnchor="end" fill="#737987" fontSize="10" fontWeight="500">75%</text>
+                <line x1="60" y1="60" x2="740" y2="60" stroke="var(--border-light, #D8E0E8)" strokeDasharray="2 3" />
+                <text x="50" y="64" textAnchor="end" fill="var(--text-muted, #8A97A5)" fontSize="10" fontWeight="500">75%</text>
 
-                <line x1="60" y1="90" x2="740" y2="90" stroke="#3D3F4E" strokeDasharray="3 3" />
-                <text x="50" y="94" textAnchor="end" fill="#9299A8" fontSize="10.5" fontWeight="600">50%</text>
+                <line x1="60" y1="90" x2="740" y2="90" stroke="var(--border-light, #D8E0E8)" strokeDasharray="3 3" />
+                <text x="50" y="94" textAnchor="end" fill="var(--text-muted, #8A97A5)" fontSize="10.5" fontWeight="600">50%</text>
 
-                <line x1="60" y1="120" x2="740" y2="120" stroke="#2C303C" strokeDasharray="2 3" />
-                <text x="50" y="124" textAnchor="end" fill="#737987" fontSize="10" fontWeight="500">25%</text>
+                <line x1="60" y1="120" x2="740" y2="120" stroke="var(--border-light, #D8E0E8)" strokeDasharray="2 3" />
+                <text x="50" y="124" textAnchor="end" fill="var(--text-muted, #8A97A5)" fontSize="10" fontWeight="500">25%</text>
 
-                <line x1="60" y1="150" x2="740" y2="150" stroke="#3D3F4E" />
-                <text x="50" y="154" textAnchor="end" fill="#9299A8" fontSize="10.5" fontWeight="600">0%</text>
+                <line x1="60" y1="150" x2="740" y2="150" stroke="var(--border-default, #B9C5D1)" strokeWidth="1" />
+                <text x="50" y="154" textAnchor="end" fill="var(--text-muted, #8A97A5)" fontSize="10.5" fontWeight="600">0%</text>
               </g>
 
-              {/* Shaded Area Below Line */}
-              <path d={chartPoints.areaD} fill="url(#trendGradient)" />
+              {/* Vertical Guide Lines Dropping to Axis */}
+              {chartPoints.pts.map((pt, i) => (
+                <line
+                  key={`vguide-${i}`}
+                  x1={pt.x}
+                  y1={pt.y}
+                  x2={pt.x}
+                  y2="150"
+                  stroke="var(--border-light, #D8E0E8)"
+                  strokeDasharray="2 2"
+                  strokeWidth="1"
+                />
+              ))}
 
-              {/* Bold Trend Curve */}
+              {/* Professional Clean Solid Trend Line */}
               <path
                 d={chartPoints.pathD}
                 fill="none"
-                stroke="#60A5FA"
-                strokeWidth="3.4"
+                stroke="var(--accent, #245B86)"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -840,7 +878,7 @@ export default function TFTPredictionsPage({
               {chartPoints.pts.map((pt, i) => {
                 const isHovered = hoveredPointIndex === i;
                 const isSelected = selectedHorizonKey === pt.key;
-                const dotColor = pt.pct >= 65 ? "#EF4444" : pt.pct >= 40 ? "#F59E0B" : "#22C55E";
+                const dotColor = pt.pct >= 65 ? "var(--state-red, #EF4444)" : pt.pct >= 40 ? "var(--state-amber, #F59E0B)" : "var(--state-green, #22C55E)";
 
                 return (
                   <g
@@ -850,59 +888,71 @@ export default function TFTPredictionsPage({
                     onMouseLeave={() => setHoveredPointIndex(null)}
                     onClick={() => setSelectedHorizonKey(pt.key)}
                   >
-                    {/* Hover Pulse Ring */}
-                    <circle
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={isHovered || isSelected ? "15" : "10"}
-                      fill={dotColor}
-                      fillOpacity={isHovered || isSelected ? 0.35 : 0.15}
-                    />
+                    {/* Subtle hover/active indicator */}
+                    {(isHovered || isSelected) && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r="8"
+                        fill={dotColor}
+                        fillOpacity="0.18"
+                      />
+                    )}
 
-                    {/* Data Node Circle */}
+                    {/* Clean Data Node Circle */}
                     <circle
                       cx={pt.x}
                       cy={pt.y}
-                      r={isHovered || isSelected ? "7" : "5.5"}
-                      fill="#161920"
+                      r={isHovered || isSelected ? "5.5" : "4.5"}
+                      fill="var(--bg-card, #FFFFFF)"
                       stroke={dotColor}
-                      strokeWidth="2.8"
+                      strokeWidth={isHovered || isSelected ? "2.5" : "2"}
                     />
 
-                    {/* High-Contrast Bold Percentage Badge */}
+                    {/* Percentage Badge */}
                     <rect
                       x={pt.x - 22}
-                      y={Math.max(6, pt.y - 25)}
+                      y={Math.max(6, pt.y - 24)}
                       width="44"
                       height="18"
                       rx="3"
-                      fill="#161920"
-                      stroke={dotColor}
-                      strokeWidth="1.2"
+                      fill="var(--bg-card, #FFFFFF)"
+                      stroke={isSelected ? dotColor : "var(--border-default, #D8E0E8)"}
+                      strokeWidth="1"
                     />
                     <text
                       x={pt.x}
-                      y={Math.max(19, pt.y - 12)}
+                      y={Math.max(18, pt.y - 11)}
                       textAnchor="middle"
-                      fill="#FFFFFF"
-                      fontSize="11.5"
-                      fontWeight="900"
+                      fill="var(--text-primary, #162334)"
+                      fontSize="11"
+                      fontWeight="700"
                       fontFamily="var(--font-sans)"
                     >
                       {pt.pct}%
                     </text>
 
-                    {/* Realtime Clock Timestamp Alone */}
+                    {/* Clean Realtime Clock Timestamp */}
                     <text
                       x={pt.x}
-                      y="178"
+                      y="174"
                       textAnchor="middle"
-                      fill="#93C5FD"
+                      fill="var(--text-primary, #162334)"
                       fontSize="12.5"
-                      fontWeight="800"
+                      fontWeight="700"
                       fontFamily="var(--font-mono, monospace)"
                     >
                       {pt.clockTime}
+                    </text>
+                    <text
+                      x={pt.x}
+                      y="189"
+                      textAnchor="middle"
+                      fill="var(--text-muted, #8A97A5)"
+                      fontSize="10"
+                      fontWeight="600"
+                    >
+                      {getHorizonLabel(pt.key, pt.label)}
                     </text>
                   </g>
                 );
@@ -913,37 +963,39 @@ export default function TFTPredictionsPage({
             {hoveredPointIndex != null && (() => {
               const pt = chartPoints.pts[hoveredPointIndex];
               const leftPct = (pt.x / 800) * 100;
+              const dotColor = pt.pct >= 65 ? "var(--state-red, #EF4444)" : pt.pct >= 40 ? "var(--state-amber, #F59E0B)" : "var(--state-green, #22C55E)";
               return (
                 <div
                   style={{
                     position: "absolute",
-                    top: "4px",
-                    left: `clamp(12px, calc(${leftPct}% - 75px), calc(100% - 160px))`,
-                    background: "rgba(22, 25, 32, 0.95)",
-                    border: "1px solid var(--border-default, #3D3F4E)",
-                    borderRadius: "4px",
-                    padding: "4px 8px",
-                    fontSize: "0.6875rem",
-                    color: "#F4F5F7",
+                    top: "6px",
+                    left: `clamp(12px, calc(${leftPct}% - 85px), calc(100% - 170px))`,
+                    background: "var(--bg-card, #FFFFFF)",
+                    border: "1px solid var(--border-default, #D8E0E8)",
+                    borderRadius: "6px",
+                    padding: "6px 10px",
+                    fontSize: "0.75rem",
+                    color: "var(--text-primary, #162334)",
                     pointerEvents: "none",
-                    boxShadow: "0 4px 14px rgba(0,0,0,0.5)",
+                    boxShadow: "var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))",
                     zIndex: 10,
+                    minWidth: "145px",
                   }}
                 >
-                  <div style={{ fontWeight: 800, color: "var(--accent-soft-blue, #7B8BC8)" }}>
-                    {pt.label} · {pt.clockTime}
+                  <div style={{ fontWeight: 700, color: "var(--accent, #245B86)", marginBottom: "4px" }}>
+                    {getHorizonLabel(pt.key, pt.label)} · {pt.clockTime}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
-                    <span style={{ color: "#9299A8" }}>Congestion:</span>
-                    <strong>{pt.pct}% ({pt.level})</strong>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", marginBottom: "2px" }}>
+                    <span style={{ color: "var(--text-muted, #8A97A5)" }}>{t("forecast.tooltipCongestion", "Congestion:")}</span>
+                    <strong style={{ color: dotColor }}>{pt.pct}% ({getLocalizedSeverity(pt.level)})</strong>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
-                    <span style={{ color: "#9299A8" }}>Est. Load:</span>
-                    <span>~{pt.projVehicles} veh</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem", marginBottom: "2px" }}>
+                    <span style={{ color: "var(--text-muted, #8A97A5)" }}>{t("forecast.tooltipEstLoad", "Est. Load:")}</span>
+                    <span style={{ fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)" }}>~{pt.projVehicles} {t("traffic.vehicles", "veh")}</span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
-                    <span style={{ color: "#9299A8" }}>Est. Speed:</span>
-                    <span>~{pt.projSpeed} km/h</span>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "0.75rem" }}>
+                    <span style={{ color: "var(--text-muted, #8A97A5)" }}>{t("forecast.tooltipEstSpeed", "Est. Speed:")}</span>
+                    <span style={{ fontFamily: "var(--font-mono, monospace)", color: "var(--text-primary, #162334)" }}>~{pt.projSpeed} km/h</span>
                   </div>
                 </div>
               );
@@ -962,52 +1014,52 @@ export default function TFTPredictionsPage({
               <thead>
                 <tr
                   style={{
-                    borderBottom: "1px solid var(--border-default, #3D3F4E)",
-                    color: "var(--text-secondary, #A0A5B5)",
-                    fontSize: "0.625rem",
+                    borderBottom: "1px solid var(--border-default, #D8E0E8)",
+                    color: "var(--text-muted, #8A97A5)",
+                    fontSize: "0.6875rem",
                     fontWeight: 700,
                     textTransform: "uppercase",
                   }}
                 >
-                  <th style={{ padding: "0.35rem 0.5rem" }}>HORIZON</th>
-                  <th style={{ padding: "0.35rem 0.5rem" }}>CLOCK TIME</th>
-                  <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>CONGESTION LEVEL</th>
-                  <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>EST. VEHICLES</th>
-                  <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>EST. SPEED</th>
-                  <th style={{ padding: "0.35rem 0.5rem", textAlign: "right" }}>STATUS</th>
+                  <th style={{ padding: "0.5rem" }}>{t("forecast.horizon", "HORIZON")}</th>
+                  <th style={{ padding: "0.5rem" }}>{t("forecast.clockTime", "CLOCK TIME")}</th>
+                  <th style={{ padding: "0.5rem", textAlign: "right" }}>{t("forecast.congestionLevel", "CONGESTION LEVEL")}</th>
+                  <th style={{ padding: "0.5rem", textAlign: "right" }}>{t("forecast.estVehicles", "EST. VEHICLES")}</th>
+                  <th style={{ padding: "0.5rem", textAlign: "right" }}>{t("forecast.estSpeed", "EST. SPEED")}</th>
+                  <th style={{ padding: "0.5rem", textAlign: "right" }}>{t("forecast.tableStatus", "STATUS")}</th>
                 </tr>
               </thead>
               <tbody>
                 {chartPoints.pts.map((pt) => {
-                  const sColor = SEVERITY_COLORS[pt.level] || "var(--status-normal, #22C55E)";
+                  const sColor = SEVERITY_COLORS[pt.level] || "var(--status-normal, #4FA878)";
                   const isSelected = selectedHorizonKey === pt.key;
                   return (
                     <tr
                       key={pt.key}
                       onClick={() => setSelectedHorizonKey(pt.key)}
                       style={{
-                        borderBottom: "1px solid var(--border-light, #2C303C)",
-                        background: isSelected ? "rgba(96, 165, 250, 0.08)" : "transparent",
+                        borderBottom: "1px solid var(--border-light, #E7ECF1)",
+                        background: isSelected ? "var(--bg-card-subtle, #F8FAFC)" : "transparent",
                         cursor: "pointer",
                       }}
                     >
-                      <td style={{ padding: "0.35rem 0.5rem", fontWeight: 700, color: "var(--text-primary, #F4F5F7)" }}>
-                        {pt.label}
+                      <td style={{ padding: "0.5rem", fontWeight: 700, color: "var(--text-primary, #162334)" }}>
+                        {getHorizonLabel(pt.key, pt.label)}
                       </td>
-                      <td style={{ padding: "0.35rem 0.5rem", fontFamily: "var(--font-mono)", color: "var(--accent-soft-blue, #7B8BC8)" }}>
+                      <td style={{ padding: "0.5rem", fontFamily: "var(--font-mono, monospace)", color: "var(--accent, #245B86)" }}>
                         {pt.clockTime}
                       </td>
-                      <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 800, color: "var(--text-primary, #F4F5F7)" }}>
+                      <td style={{ padding: "0.5rem", textAlign: "right", fontWeight: 800, color: "var(--text-primary, #162334)" }}>
                         {pt.pct != null ? `${pt.pct}%` : "—"}
                       </td>
-                      <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--text-secondary, #A0A5B5)" }}>
+                      <td style={{ padding: "0.5rem", textAlign: "right", fontFamily: "var(--font-mono, monospace)", color: "var(--text-secondary, #344256)" }}>
                         ~{pt.projVehicles}
                       </td>
-                      <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--text-secondary, #A0A5B5)" }}>
+                      <td style={{ padding: "0.5rem", textAlign: "right", fontFamily: "var(--font-mono, monospace)", color: "var(--text-secondary, #344256)" }}>
                         ~{pt.projSpeed} km/h
                       </td>
-                      <td style={{ padding: "0.35rem 0.5rem", textAlign: "right", fontWeight: 800, color: sColor }}>
-                        {pt.level}
+                      <td style={{ padding: "0.5rem", textAlign: "right", fontWeight: 700, color: sColor }}>
+                        {getLocalizedSeverity(pt.level)}
                       </td>
                     </tr>
                   );

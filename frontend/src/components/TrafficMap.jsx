@@ -82,6 +82,8 @@ function renderSmallOverviewHtml({
   hasDetailsAction = true,
   hasCameraAction = false,
   cameraId = null,
+  t = null,
+  tJunction = null,
 }) {
   let statusColor = "#16A34A";
   let statusBg = "#F0FDF4";
@@ -109,6 +111,11 @@ function renderSmallOverviewHtml({
     statusBg = "#F0FDF4";
     statusBorder = "#BBF7D0";
   }
+
+  const inspectLabel = t ? t("actions.inspectDetails", "Inspect Details") : "Inspect Details";
+  const viewCctvLabel = t ? t("actions.viewCCTV", "View CCTV") : "View CCTV";
+  const controlActiveLabel = t ? t("actions.controlActive", "Control Active") : "Control Active";
+  const localizedStatus = t ? t(`status.${status.toLowerCase()}`, status) : status;
 
   return `
     <div style="
@@ -149,7 +156,7 @@ function renderSmallOverviewHtml({
           letter-spacing: 0.03em;
           flex-shrink: 0;
         ">
-          ${status}
+          ${localizedStatus}
         </span>
       </div>
 
@@ -227,7 +234,7 @@ function renderSmallOverviewHtml({
             border-radius: 3px;
             cursor: pointer;
           ">
-            Inspect Details
+            ${inspectLabel}
           </button>
         ` : `<span></span>`}
 
@@ -242,10 +249,10 @@ function renderSmallOverviewHtml({
             border-radius: 3px;
             cursor: pointer;
           ">
-            View CCTV
+            ${viewCctvLabel}
           </button>
         ` : `
-          <span style="font-size: 8.5px; color: #64748B; font-weight: 600;">Control Active</span>
+          <span style="font-size: 8.5px; color: #64748B; font-weight: 600;">${controlActiveLabel}</span>
         `}
       </div>
     </div>
@@ -290,6 +297,9 @@ export default function TrafficMap({
   try {
     settingsContext = useSettings();
   } catch (e) {}
+
+  const t = settingsContext?.t || ((k, def) => def);
+  const tJunction = settingsContext?.tJunction || ((s) => s);
 
   const effectiveMapStyle = propMapStyle || settingsContext?.settings?.mapStyle || "standard";
   const globalLayers = settingsContext?.settings?.mapLayers;
@@ -526,8 +536,13 @@ export default function TrafficMap({
     routeMarkersRef.current = [];
 
     // 3a. Render Junction Markers
-    if (layers.junctions && areaJunctions && areaJunctions.length > 0) {
-      areaJunctions.forEach((jnc) => {
+    const activeJunctions = [...(areaJunctions || [])];
+    if (selectedJunction && selectedJunction.coords && !activeJunctions.some(j => (j.id && j.id === selectedJunction.id) || (j.name && j.name === selectedJunction.name))) {
+      activeJunctions.push(selectedJunction);
+    }
+
+    if (layers.junctions && activeJunctions.length > 0) {
+      activeJunctions.forEach((jnc) => {
         if (!jnc.coords || jnc.coords.length < 2) return;
         const [jLon, jLat] = jnc.coords;
         const isSelected = selectedJunction?.id === jnc.id;
@@ -543,6 +558,10 @@ export default function TrafficMap({
         const isCritical = jnc.congestionScore >= 0.81;
         const isHigh = jnc.congestionScore >= 0.61 && !isCritical;
         const statusText = jnc.status || (isCritical ? "CRITICAL" : isHigh ? "HIGH" : "NORMAL");
+
+        const localizedJncName = tJunction(jnc.name);
+        const localizedDistrict = tJunction(jnc.district || districtName || "TAMIL NADU");
+        const localizedStatusText = t(`status.${statusText.toLowerCase()}`, statusText);
 
         // SVG Pin Element with Integrated Hover Tooltip
         const pinEl = document.createElement("div");
@@ -573,46 +592,48 @@ export default function TrafficMap({
                 white-space: nowrap;
                 letter-spacing: 0.02em;
               ">
-                ${jnc.name}
+                ${localizedJncName}
               </div>
             ` : ''}
           </div>
 
           <div class="map-junction-hover-tooltip">
             <div style="font-weight: 800; font-size: 10px; color: #f8fafc; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-              <span>${jnc.name}</span>
+              <span>${localizedJncName}</span>
               <span style="font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; background: ${risk.color}; color: #ffffff; text-transform: uppercase;">
-                ${statusText}
+                ${localizedStatusText}
               </span>
             </div>
             <div style="font-size: 9.5px; color: #cbd5e1; font-family: monospace; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
-              <span>Vehicles: <strong style="color: #ffffff;">${vCount}</strong></span>
+              <span>${t("traffic.vehicles", "Vehicles")}: <strong style="color: #ffffff;">${vCount}</strong></span>
               <span style="color: #64748b;">•</span>
-              <span>Speed: <strong style="color: #38bdf8;">${spd}</strong></span>
+              <span>${t("traffic.averageSpeed", "Speed")}: <strong style="color: #38bdf8;">${spd}</strong></span>
               <span style="color: #64748b;">•</span>
-              <span>Occ: <strong style="color: ${jnc.metrics?.roadOccupancyPct > 60 ? '#f87171' : '#4ade80'};">${occ}</strong></span>
+              <span>${t("traffic.occupancy", "Occ")}: <strong style="color: ${jnc.metrics?.roadOccupancyPct > 60 ? '#f87171' : '#4ade80'};">${occ}</strong></span>
             </div>
           </div>
         `;
 
         const jncPopupHtml = renderSmallOverviewHtml({
-          title: jnc.name,
-          subTitle: `${jnc.district || districtName || "TAMIL NADU"} • JUNCTION OVERVIEW`,
+          title: localizedJncName,
+          subTitle: `${localizedDistrict} • ${t("map.trafficOverview", "JUNCTION OVERVIEW")}`,
           status: jnc.status || (jnc.congestionScore >= 0.81 ? "CRITICAL" : jnc.congestionScore >= 0.61 ? "HIGH" : jnc.congestionScore >= 0.31 ? "MODERATE" : "NORMAL"),
           congestionScore: jnc.congestionScore || 0.2,
           metrics: [
-            { label: "Vehicles", value: vCount },
-            { label: "Avg Speed", value: spd, color: jnc.metrics?.averageSpeedKmh < 25 ? "#dc2626" : "#0f172a" },
-            { label: "Occupancy", value: occ, color: jnc.metrics?.roadOccupancyPct > 60 ? "#dc2626" : "#0f172a" },
+            { label: t("traffic.vehicles", "Vehicles"), value: vCount },
+            { label: t("traffic.averageSpeed", "Avg Speed"), value: spd, color: jnc.metrics?.averageSpeedKmh < 25 ? "#dc2626" : "#0f172a" },
+            { label: t("traffic.occupancy", "Occupancy"), value: occ, color: jnc.metrics?.roadOccupancyPct > 60 ? "#dc2626" : "#0f172a" },
           ],
           secondaryInfo: [
-            { label: "Cameras", value: `${onlineCams}/${totalCams} Online`, color: onlineCams > 0 ? "#16a34a" : "#64748b" },
-            { label: "Forecast", value: forecastText, color: forecastText === "CRITICAL" ? "#dc2626" : forecastText === "HIGH" ? "#ea580c" : "#16a34a" },
+            { label: t("kpi.camerasOnline", "Cameras"), value: `${onlineCams}/${totalCams} ${t("common.online", "Online")}`, color: onlineCams > 0 ? "#16a34a" : "#64748b" },
+            { label: t("nav.forecast", "Forecast"), value: t(`status.${forecastText.toLowerCase()}`, forecastText), color: forecastText === "CRITICAL" ? "#dc2626" : forecastText === "HIGH" ? "#ea580c" : "#16a34a" },
           ],
           incident: jnc.incident,
           hasDetailsAction: true,
           hasCameraAction: Boolean(firstCamId),
           cameraId: firstCamId,
+          t,
+          tJunction,
         });
 
         const jncPopup = new maplibregl.Popup({
@@ -735,7 +756,8 @@ export default function TrafficMap({
         camEl.style.justifyContent = "center";
         camEl.style.cursor = "pointer";
         camEl.style.zIndex = "8";
-        camEl.title = `Camera: ${cam.id} (${cam.approach || cam.location || cam.name})`;
+        const localizedApproach = tJunction(cam.approach || cam.location || cam.name || "Traffic Approach");
+        camEl.title = `${t("header.cameras", "Camera")}: ${cam.id} (${localizedApproach})`;
         camEl.innerHTML = `
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:block;">
             <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/>
@@ -746,12 +768,12 @@ export default function TrafficMap({
         const camPopupHtml = `
           <div style="font-family: Inter, sans-serif; font-size: 11px; padding: 2px; min-width: 140px;">
             <strong style="color: #0f172a; font-size: 12px;">${cam.id}</strong><br/>
-            <span style="color: #64748b;">${cam.approach || cam.location || "Traffic Approach"}</span>
+            <span style="color: #64748b;">${localizedApproach}</span>
             <div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; font-size: 10px;">
-              <div>Status: <strong style="color: ${isOnline ? '#16a34a' : '#dc2626'};">${cam.status}</strong></div>
+              <div>${t("traffic.status", "Status")}: <strong style="color: ${isOnline ? '#16a34a' : '#dc2626'};">${t(`status.${cam.status.toLowerCase()}`, cam.status)}</strong></div>
             </div>
             <div style="margin-top: 5px; text-align: right;">
-              <span style="font-size: 9px; color: #2563eb; font-weight: 700;">Click to view feed</span>
+              <span style="font-size: 9px; color: #2563eb; font-weight: 700;">${t("actions.viewCCTV", "Click to view feed")}</span>
             </div>
           </div>
         `;
@@ -804,60 +826,71 @@ export default function TrafficMap({
           const forecastText = matchedJnc.prediction?.next15Min || (matchedJnc.congestionScore >= 0.81 ? "CRITICAL" : matchedJnc.congestionScore >= 0.61 ? "HIGH" : "Moderate");
           camId = matchedJnc.cameras?.[0]?.id || null;
 
+          const localizedMatchedName = tJunction(matchedJnc.name);
+          const localizedMatchedDistrict = tJunction(matchedJnc.district || districtName || "TAMIL NADU");
           popupHtml = renderSmallOverviewHtml({
-            title: matchedJnc.name,
-            subTitle: `${matchedJnc.district || districtName || "TAMIL NADU"} • JUNCTION OVERVIEW`,
+            title: localizedMatchedName,
+            subTitle: `${localizedMatchedDistrict} • ${t("map.trafficOverview", "JUNCTION OVERVIEW")}`,
             status: matchedJnc.status || (matchedJnc.congestionScore >= 0.81 ? "CRITICAL" : matchedJnc.congestionScore >= 0.61 ? "HIGH" : matchedJnc.congestionScore >= 0.31 ? "MODERATE" : "NORMAL"),
             congestionScore: matchedJnc.congestionScore || 0.2,
             metrics: [
-              { label: "Vehicles", value: vCount },
-              { label: "Avg Speed", value: spd, color: matchedJnc.metrics?.averageSpeedKmh < 25 ? "#dc2626" : "#0f172a" },
-              { label: "Occupancy", value: occ, color: matchedJnc.metrics?.roadOccupancyPct > 60 ? "#dc2626" : "#0f172a" },
+              { label: t("traffic.vehicles", "Vehicles"), value: vCount },
+              { label: t("traffic.averageSpeed", "Avg Speed"), value: spd, color: matchedJnc.metrics?.averageSpeedKmh < 25 ? "#dc2626" : "#0f172a" },
+              { label: t("traffic.occupancy", "Occupancy"), value: occ, color: matchedJnc.metrics?.roadOccupancyPct > 60 ? "#dc2626" : "#0f172a" },
             ],
             secondaryInfo: [
-              { label: "Cameras", value: `${onlineCams}/${totalCams} Online`, color: onlineCams > 0 ? "#16a34a" : "#64748b" },
-              { label: "Forecast", value: forecastText, color: forecastText === "CRITICAL" ? "#dc2626" : forecastText === "HIGH" ? "#ea580c" : "#16a34a" },
+              { label: t("kpi.camerasOnline", "Cameras"), value: `${onlineCams}/${totalCams} ${t("common.online", "Online")}`, color: onlineCams > 0 ? "#16a34a" : "#64748b" },
+              { label: t("nav.forecast", "Forecast"), value: t(`status.${forecastText.toLowerCase()}`, forecastText), color: forecastText === "CRITICAL" ? "#dc2626" : forecastText === "HIGH" ? "#ea580c" : "#16a34a" },
             ],
             incident: matchedJnc.incident,
             hasDetailsAction: true,
             hasCameraAction: Boolean(camId),
             cameraId: camId,
+            t,
+            tJunction,
           });
         } else if (overview) {
+          const localizedOverviewLoc = tJunction(selectedLocation.name);
+          const localizedOverviewDistrict = tJunction(selectedLocation.district || districtName || "TAMIL NADU");
           popupHtml = renderSmallOverviewHtml({
-            title: selectedLocation.name,
-            subTitle: `${selectedLocation.district || districtName || "TAMIL NADU"} • AREA OVERVIEW`,
+            title: localizedOverviewLoc,
+            subTitle: `${localizedOverviewDistrict} • ${t("map.trafficOverview", "AREA OVERVIEW")}`,
             status: overview.highRiskJunctionsCount > 1 ? "ELEVATED" : "MODERATE",
             congestionScore: overview.highRiskJunctionsCount > 1 ? 0.65 : 0.35,
             metrics: [
-              { label: "Junctions", value: overview.majorJunctionsCount ?? areaJunctions.length },
-              { label: "Critical/High", value: overview.highRiskJunctionsCount ?? 0, color: overview.highRiskJunctionsCount > 0 ? "#dc2626" : "#0f172a" },
-              { label: "Incidents", value: overview.activeIncidentsCount ?? 0, color: overview.activeIncidentsCount > 0 ? "#ea580c" : "#0f172a" },
+              { label: t("kpi.junctions", "Junctions"), value: overview.majorJunctionsCount ?? areaJunctions.length },
+              { label: t("alerts.filterCritical", "Critical/High"), value: overview.highRiskJunctionsCount ?? 0, color: overview.highRiskJunctionsCount > 0 ? "#dc2626" : "#0f172a" },
+              { label: t("cctv.incidents", "Incidents"), value: overview.activeIncidentsCount ?? 0, color: overview.activeIncidentsCount > 0 ? "#ea580c" : "#0f172a" },
             ],
             secondaryInfo: [
-              { label: "Cameras", value: `${overview.availableCamerasCount || 0} Online`, color: "#16a34a" },
-              { label: "Forecast", value: overview.predictedCongestion || "Moderate", color: "#2563eb" },
+              { label: t("kpi.camerasOnline", "Cameras"), value: `${overview.availableCamerasCount || 0} ${t("common.online", "Online")}`, color: "#16a34a" },
+              { label: t("nav.forecast", "Forecast"), value: tJunction(overview.predictedCongestion || "Moderate"), color: "#2563eb" },
             ],
             incident: null,
             hasDetailsAction: false,
             hasCameraAction: false,
+            t,
+            tJunction,
           });
         } else {
+          const localizedSearchLoc = tJunction(selectedLocation.name);
           popupHtml = renderSmallOverviewHtml({
-            title: selectedLocation.name,
-            subTitle: isGps ? "CURRENT LOCATION • GPS POSITION" : "SEARCHED LOCATION",
-            status: isGps ? "GPS ACTIVE" : "MONITORED",
+            title: localizedSearchLoc,
+            subTitle: isGps ? `${t("common.currentLocation", "CURRENT LOCATION")} • GPS` : localizedSearchLoc,
+            status: isGps ? "LIVE GPS" : "MONITORED",
             congestionScore: 0.2,
             metrics: [
-              { label: "Latitude", value: curLat.toFixed(4) },
-              { label: "Longitude", value: curLon.toFixed(4) },
-              { label: "Status", value: isGps ? "Live GPS" : "Active Pin", color: "#2563eb" },
+              { label: "Lat", value: curLat.toFixed(4) },
+              { label: "Lon", value: curLon.toFixed(4) },
+              { label: t("traffic.status", "Status"), value: isGps ? "Live GPS" : "Active Pin", color: "#2563eb" },
             ],
             secondaryInfo: [
-              { label: "Coverage", value: "Tamil Nadu Control", color: "#16a34a" },
+              { label: t("nav.trafficControl", "Control"), value: "Tamil Nadu Control", color: "#16a34a" },
             ],
             hasDetailsAction: false,
             hasCameraAction: false,
+            t,
+            tJunction,
           });
         }
 
@@ -882,17 +915,17 @@ export default function TrafficMap({
 
             <div class="map-junction-hover-tooltip">
               <div style="font-weight: 800; font-size: 10px; color: #f8fafc; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <span>CURRENT LOCATION · ${locShort.toUpperCase()}</span>
+                <span>${t("common.currentLocation", "CURRENT LOCATION").toUpperCase()} · ${tJunction(locShort).toUpperCase()}</span>
                 <span style="font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; background: #3E4776; color: #7B8BC8;">
                   LIVE GPS
                 </span>
               </div>
               <div style="font-size: 9.5px; color: #cbd5e1; font-family: monospace; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
-                <span>Vehicles: <strong style="color: #ffffff;">${vCount}</strong></span>
+                <span>${t("traffic.vehicles", "Vehicles")}: <strong style="color: #ffffff;">${vCount}</strong></span>
                 <span style="color: #64748b;">•</span>
-                <span>Speed: <strong style="color: #7B8BC8;">${spd}</strong></span>
+                <span>${t("traffic.averageSpeed", "Speed")}: <strong style="color: #7B8BC8;">${spd}</strong></span>
                 <span style="color: #64748b;">•</span>
-                <span>Occ: <strong style="color: #F45E70;">${occ}</strong></span>
+                <span>${t("traffic.occupancy", "Occ")}: <strong style="color: #F45E70;">${occ}</strong></span>
               </div>
             </div>
           `;
@@ -901,6 +934,8 @@ export default function TrafficMap({
           const spd = matchedJnc?.metrics?.averageSpeedKmh != null ? `${matchedJnc.metrics.averageSpeedKmh} km/h` : "--";
           const occ = matchedJnc?.metrics?.roadOccupancyPct != null ? `${matchedJnc.metrics.roadOccupancyPct}%` : "--";
           const statusText = matchedJnc ? (matchedJnc.status || (matchedJnc.congestionScore >= 0.81 ? "CRITICAL" : "HIGH")) : "MONITORED";
+          const localizedLocName = tJunction(selectedLocation.name);
+          const localizedStatusText = t(`status.${statusText.toLowerCase()}`, statusText);
 
           pinEl.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -925,23 +960,23 @@ export default function TrafficMap({
                 white-space: nowrap;
                 letter-spacing: 0.02em;
               ">
-                ${selectedLocation.name}
+                ${localizedLocName}
               </div>
             </div>
 
             <div class="map-junction-hover-tooltip">
               <div style="font-weight: 800; font-size: 10px; color: #f8fafc; margin-bottom: 3px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                <span>${selectedLocation.name}</span>
+                <span>${localizedLocName}</span>
                 <span style="font-size: 8px; font-weight: 800; padding: 1px 4px; border-radius: 2px; background: #2563eb; color: #ffffff;">
-                  ${statusText}
+                  ${localizedStatusText}
                 </span>
               </div>
               <div style="font-size: 9.5px; color: #cbd5e1; font-family: monospace; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
-                <span>Vehicles: <strong style="color: #ffffff;">${vCount}</strong></span>
+                <span>${t("traffic.vehicles", "Vehicles")}: <strong style="color: #ffffff;">${vCount}</strong></span>
                 <span style="color: #64748b;">•</span>
-                <span>Speed: <strong style="color: #38bdf8;">${spd}</strong></span>
+                <span>${t("traffic.averageSpeed", "Speed")}: <strong style="color: #38bdf8;">${spd}</strong></span>
                 <span style="color: #64748b;">•</span>
-                <span>Occ: <strong style="color: #f87171;">${occ}</strong></span>
+                <span>${t("traffic.occupancy", "Occ")}: <strong style="color: #f87171;">${occ}</strong></span>
               </div>
             </div>
           `;
@@ -1215,14 +1250,14 @@ export default function TrafficMap({
             font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           ">
             <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ffffff;"></span>
-            <span>FROM: ${originName}</span>
+            <span>${t("map.fromPrefix", "FROM: {name}", { name: tJunction(originName) })}</span>
           </div>
         `;
 
         const startPopupHtml = `
           <div style="font-family: Inter, sans-serif; font-size: 11px; padding: 2px;">
-            <div style="color: #1a73e8; font-weight: 800; font-size: 9px; text-transform: uppercase;">Origin (From)</div>
-            <strong style="color: #0f172a; font-size: 12px;">${originName}</strong>
+            <div style="color: #1a73e8; font-weight: 800; font-size: 9px; text-transform: uppercase;">${t("map.originFrom", "Origin (From)")}</div>
+            <strong style="color: #0f172a; font-size: 12px;">${tJunction(originName)}</strong>
           </div>
         `;
 
@@ -1256,7 +1291,7 @@ export default function TrafficMap({
             font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           ">
             <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ffffff;"></span>
-            <span>TO: ${destName}</span>
+            <span>${t("map.toPrefix", "TO: {name}", { name: tJunction(destName) })}</span>
           </div>
         `;
 
@@ -1269,11 +1304,11 @@ export default function TrafficMap({
 
         const destPopupHtml = `
           <div style="font-family: Inter, sans-serif; font-size: 11px; padding: 2px; min-width: 140px;">
-            <div style="color: #dc2626; font-weight: 800; font-size: 9px; text-transform: uppercase;">Destination Location</div>
-            <strong style="color: #0f172a; font-size: 12px;">${destName}</strong>
+            <div style="color: #dc2626; font-weight: 800; font-size: 9px; text-transform: uppercase;">${t("map.destinationTo", "Destination (To)")}</div>
+            <strong style="color: #0f172a; font-size: 12px;">${tJunction(destName)}</strong>
             <div style="margin-top: 4px; padding-top: 4px; border-top: 1px solid #e2e8f0; font-size: 10px; display: flex; justify-content: space-between;">
-              <span>Distance: <strong>${recDistanceKm}</strong></span>
-              <span>ETA: <strong>${recEtaMin}</strong></span>
+              <span>${t("routes.distance", "Distance")}: <strong>${recDistanceKm}</strong></span>
+              <span>${t("routes.travelTime", "ETA")}: <strong>${recEtaMin}</strong></span>
             </div>
           </div>
         `;
@@ -1377,7 +1412,7 @@ export default function TrafficMap({
             white-space: nowrap;
             font-family: Inter, sans-serif;
           ">
-            <span>DIVERSION: ${diversionData.recommendedName || "Flyover Bypass"}</span>
+            <span>${t("routes.diversionPrefix", "DIVERSION: {name}", { name: tJunction(diversionData.recommendedName || "Flyover Bypass") })}</span>
           </div>
         `;
         const divMarker = new maplibregl.Marker({ element: divEl, anchor: "bottom" })
@@ -1413,7 +1448,7 @@ export default function TrafficMap({
       routeMarkersRef.current.forEach((m) => m.remove());
       routeMarkersRef.current = [];
     }
-  }, [mapLoaded, areaJunctions, selectedJunction, selectedLocation, cameraTelemetry, routeResult, activeStrategy, diversionData, layers, fromLocation, toLocation, areaOverview, districtName]);
+  }, [mapLoaded, areaJunctions, selectedJunction, selectedLocation, cameraTelemetry, routeResult, activeStrategy, diversionData, layers, fromLocation, toLocation, areaOverview, districtName, settingsContext?.settings?.language]);
 
   return (
     <div
@@ -1451,7 +1486,7 @@ export default function TrafficMap({
               }}
             >
               <Layers size={13} color="var(--accent-soft-blue, #7B8BC8)" />
-              <span>Map Layers</span>
+              <span>{t("map.layers", "Map Layers")}</span>
             </button>
 
             {showLayerMenu && (
@@ -1478,7 +1513,7 @@ export default function TrafficMap({
                     onChange={(e) => handleToggleLayer("junctions", e.target.checked)}
                     style={{ accentColor: "var(--accent-soft-blue, #7B8BC8)", cursor: "pointer" }}
                   />
-                  <span>Junctions</span>
+                  <span>{t("map.layerJunctions", "Junctions")}</span>
                 </label>
 
                 <label style={{ display: "flex", alignItems: "center", gap: "7px", cursor: "pointer", color: "var(--text-primary, #F4F5F7)", fontWeight: 600 }}>
@@ -1488,7 +1523,7 @@ export default function TrafficMap({
                     onChange={(e) => handleToggleLayer("cameras", e.target.checked)}
                     style={{ accentColor: "var(--accent-soft-blue, #7B8BC8)", cursor: "pointer" }}
                   />
-                  <span>Cameras</span>
+                  <span>{t("map.layerCameras", "Cameras")}</span>
                 </label>
 
                 <label style={{ display: "flex", alignItems: "center", gap: "7px", cursor: "pointer", color: "var(--text-primary, #F4F5F7)", fontWeight: 600 }}>
@@ -1498,7 +1533,7 @@ export default function TrafficMap({
                     onChange={(e) => handleToggleLayer("routes", e.target.checked)}
                     style={{ accentColor: "var(--accent-soft-blue, #7B8BC8)", cursor: "pointer" }}
                   />
-                  <span>Routes</span>
+                  <span>{t("map.layerRoutes", "Routes")}</span>
                 </label>
               </div>
             )}
@@ -1523,41 +1558,41 @@ export default function TrafficMap({
             }}
           >
             <div style={{ fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", fontSize: "9px", letterSpacing: "0.03em" }}>
-              Junction Status
+              {t("map.junctionStatus", "Junction Status")}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#22C55E" }} />
-              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>Normal</span>
+              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("status.normal", "Normal")}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#C2BB91" }} />
-              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>Moderate</span>
+              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("status.moderate", "Moderate")}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#F59E0B" }} />
-              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>High</span>
+              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("status.high", "High")}</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: "#F45E70" }} />
-              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>Critical</span>
+              <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("status.critical", "Critical")}</span>
             </div>
             {(routeResult || diversionData) && (
               <div style={{ borderTop: "1px solid var(--border-light, #2C303C)", paddingTop: "4px", marginTop: "3px", display: "flex", flexDirection: "column", gap: "3px" }}>
                 <div style={{ fontWeight: 800, color: "var(--text-muted, #737987)", textTransform: "uppercase", fontSize: "9px", letterSpacing: "0.03em" }}>
-                  Routes
+                  {t("map.routesLegend", "Routes")}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ display: "inline-block", width: 14, height: 4, borderRadius: 2, background: "#7B8BC8" }} />
-                  <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>Recommended</span>
+                  <span style={{ display: "inline-block", width: 14, height: 4, borderRadius: 2, background: "#2563EB" }} />
+                  <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("map.recommended", "Recommended")}</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ display: "inline-block", width: 14, height: 3, borderRadius: 2, background: "#22C55E" }} />
-                  <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>Alternative</span>
+                  <span style={{ display: "inline-block", width: 14, height: 3, borderRadius: 2, background: "#16A34A" }} />
+                  <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("map.alternative", "Alternative")}</span>
                 </div>
                 {diversionData && (
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ display: "inline-block", width: 14, height: 3, borderRadius: 2, background: "#F45E70" }} />
-                    <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>Congested</span>
+                    <span style={{ display: "inline-block", width: 14, height: 3, borderRadius: 2, background: "#DC2626" }} />
+                    <span style={{ color: "var(--text-secondary, #A7ACB8)" }}>{t("map.congested", "Congested")}</span>
                   </div>
                 )}
               </div>

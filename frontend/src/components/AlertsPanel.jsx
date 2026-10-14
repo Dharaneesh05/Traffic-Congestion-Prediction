@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { sendOfficerAction } from "../api";
+import { useSettings } from "../context/SettingsContext";
 
-export const formatIncidentLabel = (a) => {
+export const formatIncidentLabelKey = (a) => {
   const status = (a?.status || "").toUpperCase();
   const reason = (a?.reason || a?.message || a?.condition || "").toUpperCase();
   const sev = (a?.severity || "").toUpperCase();
 
   // 1. Normalized / Resolved
   if (status === "RESOLVED" || status === "INCIDENT RESOLVED") {
-    return "TRAFFIC NORMALIZED";
+    return "trafficNormalized";
   }
 
   // 2. Diversion Active / Accepted
@@ -18,12 +19,12 @@ export const formatIncidentLabel = (a) => {
     reason.includes("DIVERSION ACCEPTED") ||
     reason.includes("ALTERNATE ROUTE ACTIVE")
   ) {
-    return "DIVERSION ACTIVE";
+    return "diversionActive";
   }
 
   // 3. Diversion Rejected
   if (status === "ACTION REJECTED" || reason.includes("DIVERSION REJECTED")) {
-    return "DIVERSION REJECTED";
+    return "diversionRejected";
   }
 
   // 4. Camera Offline
@@ -33,7 +34,7 @@ export const formatIncidentLabel = (a) => {
     reason.includes("OFFLINE") ||
     (a?.camera_id && reason.includes("DISCONNECTED"))
   ) {
-    return "CAMERA OFFLINE";
+    return "cameraOffline";
   }
 
   // 5. Manual control / inspection
@@ -44,7 +45,7 @@ export const formatIncidentLabel = (a) => {
     reason.includes("CHECK REQUIRED") ||
     reason.includes("INSPECTION")
   ) {
-    return "TRAFFIC CHECK REQUIRED";
+    return "trafficCheckRequired";
   }
 
   // 6. Critical congestion / standstill
@@ -54,29 +55,42 @@ export const formatIncidentLabel = (a) => {
     reason.includes("SEVERE") ||
     reason.includes("CRITICAL")
   ) {
-    return "CRITICAL CONGESTION";
+    return "criticalCongestion";
   }
 
   // 7. High congestion (default active incident)
-  return "HIGH CONGESTION";
+  return "highCongestion";
+};
+
+export const formatIncidentLabel = (a, t = null) => {
+  const key = formatIncidentLabelKey(a);
+  const fallbacks = {
+    trafficNormalized: "TRAFFIC NORMALIZED",
+    diversionActive: "DIVERSION ACTIVE",
+    diversionRejected: "DIVERSION REJECTED",
+    cameraOffline: "CAMERA OFFLINE",
+    trafficCheckRequired: "TRAFFIC CHECK REQUIRED",
+    criticalCongestion: "CRITICAL CONGESTION",
+    highCongestion: "HIGH CONGESTION",
+  };
+  if (t) {
+    return t(`incident.${key}`, fallbacks[key]);
+  }
+  return fallbacks[key];
 };
 
 export const getIncidentLabelColor = (label) => {
-  switch (label) {
-    case "CRITICAL CONGESTION":
-    case "CAMERA OFFLINE":
-    case "DIVERSION REJECTED":
-      return "var(--status-critical, #F45E70)";
-    case "HIGH CONGESTION":
-    case "TRAFFIC CHECK REQUIRED":
-      return "var(--status-high, #F59E0B)";
-    case "TRAFFIC NORMALIZED":
-      return "var(--status-normal, #22C55E)";
-    case "DIVERSION ACTIVE":
-      return "var(--accent-soft-blue, #60A5FA)";
-    default:
-      return "var(--text-primary, #F4F5F7)";
+  const s = String(label || "").toUpperCase();
+  if (s.includes("CRITICAL") || s.includes("OFFLINE") || s.includes("REJECTED") || s.includes("ஆபத்தான") || s.includes("நிராகரிக்க")) {
+    return "var(--status-critical, #F45E70)";
   }
+  if (s.includes("NORMAL") || s.includes("RESOLVED") || s.includes("சீரானது") || s.includes("தீர்க்க")) {
+    return "var(--status-normal, #22C55E)";
+  }
+  if (s.includes("DIVERSION") || s.includes("ACTIVE") || s.includes("மாற்றுப்பாதை") || s.includes("செயலில்")) {
+    return "var(--accent-soft-blue, #60A5FA)";
+  }
+  return "var(--status-high, #F59E0B)";
 };
 
 export default function AlertsPanel({
@@ -86,6 +100,7 @@ export default function AlertsPanel({
   onOfficerAction,
   selectedJunction = null,
 }) {
+  const { t, tJunction } = useSettings();
   const [localAlerts, setLocalAlerts] = useState(alerts);
 
   // Synchronize localAlerts when prop updates, preserving resolved states
@@ -125,15 +140,14 @@ export default function AlertsPanel({
   };
 
   const formatAlertTimestamp = (raw) => {
-    if (!raw) return "Just now";
+    if (!raw) return t("common.justNow", "Just now");
     if (typeof raw === "string") {
-      if (
-        raw.includes("AM") ||
-        raw.includes("PM") ||
-        raw.includes("ago") ||
-        raw.includes("Just") ||
-        raw.includes("Active")
-      ) {
+      if (raw === "Just now" || raw === "Just") return t("common.justNow", "Just now");
+      if (raw === "Active") return t("common.activeNow", "Active");
+      if (raw.includes("ago")) {
+        return raw.replace("min ago", `${t("common.min", "min")} ${t("common.ago", "ago")}`);
+      }
+      if (raw.includes("AM") || raw.includes("PM")) {
         return raw;
       }
     }
@@ -196,9 +210,9 @@ export default function AlertsPanel({
         <div style={{ maxHeight: "420px", overflowY: "auto" }}>
           {localAlerts.map((a, i) => {
             const alertId = a.alert_id || `ALT-${i}`;
-            const incidentLabel = formatIncidentLabel(a);
+            const incidentLabel = formatIncidentLabel(a, t);
             const labelColor = getIncidentLabelColor(incidentLabel);
-            const isResolved = incidentLabel === "TRAFFIC NORMALIZED";
+            const isResolved = a.status === "RESOLVED" || a.status === "INCIDENT RESOLVED" || formatIncidentLabelKey(a) === "trafficNormalized";
             const locName = getLocationLabel(a);
             const displayTime = formatAlertTimestamp(a.timestamp);
 
@@ -233,7 +247,7 @@ export default function AlertsPanel({
                       letterSpacing: "0.01em",
                     }}
                   >
-                    {locName}
+                    {tJunction ? tJunction(locName) : locName}
                   </span>
                   <span
                     style={{
@@ -287,7 +301,7 @@ export default function AlertsPanel({
                         transition: "all 0.15s ease",
                       }}
                     >
-                      RESOLVE
+                      {t("actions.resolve", "RESOLVE")}
                     </button>
                   )}
 
@@ -309,7 +323,7 @@ export default function AlertsPanel({
                         transition: "all 0.15s ease",
                       }}
                     >
-                      VIEW MAP
+                      {t("actions.viewMap", "VIEW MAP")}
                     </button>
                   )}
                 </div>
@@ -333,7 +347,7 @@ export default function AlertsPanel({
               letterSpacing: "0.04em",
             }}
           >
-            NO ATTENTION REQUIRED ITEMS
+            {t("alerts.noAttentionItems", "NO ATTENTION REQUIRED ITEMS")}
           </div>
           <div
             style={{
@@ -342,7 +356,7 @@ export default function AlertsPanel({
               marginTop: "0.25rem",
             }}
           >
-            All Tamil Nadu highway corridors and junction approaches operating nominally.
+            {t("alerts.allCorridorsNominal", "All Tamil Nadu highway corridors and junction approaches operating nominally.")}
           </div>
         </div>
       )}

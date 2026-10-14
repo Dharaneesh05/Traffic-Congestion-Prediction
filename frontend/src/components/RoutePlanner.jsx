@@ -54,7 +54,7 @@ export default function RoutePlanner({
   onClearRoute = null,
   onLocationChange = null,
 }) {
-  const { t } = useSettings();
+  const { t, tJunction } = useSettings();
   const [fromName, setFromName] = useState(selectedFrom || selectedJunction?.name || "");
   const [toName, setToName] = useState(selectedTo || "");
   const [focusedField, setFocusedField] = useState("from");
@@ -242,8 +242,8 @@ export default function RoutePlanner({
   return (
     <div
       style={{
-        background: "var(--bg-surface, #1B2028)",
-        border: "1px solid var(--border-default, #3D3F4E)",
+        background: "var(--bg-card, #FFFFFF)",
+        border: "1px solid var(--border-default, #D8E0E8)",
         borderRadius: "4px",
         padding: "0.75rem 1rem",
         display: "flex",
@@ -257,13 +257,13 @@ export default function RoutePlanner({
           style={{
             fontSize: "0.8125rem",
             fontWeight: 800,
-            color: "var(--text-primary, #F4F5F7)",
+            color: "var(--text-primary, #162334)",
             textTransform: "uppercase",
             letterSpacing: "0.04em",
             margin: 0,
           }}
         >
-          ROUTE
+          {t("routes.routeTitle", "ROUTE")}
         </h2>
       </div>
 
@@ -272,14 +272,14 @@ export default function RoutePlanner({
         <div
           style={{
             fontSize: "0.6875rem",
-            color: "var(--status-critical, #F45E70)",
+            color: "var(--state-red, #EF4444)",
             display: "flex",
             alignItems: "center",
             gap: "0.35rem",
           }}
         >
-          <AlertTriangle size={12} color="var(--status-critical, #F45E70)" style={{ flexShrink: 0 }} />
-          <span>Route not available · Check the starting point and destination.</span>
+          <AlertTriangle size={12} color="var(--state-red, #EF4444)" style={{ flexShrink: 0 }} />
+          <span>{t("routes.routeUnavailable", "Route not available · Check the starting point and destination.")}</span>
         </div>
       )}
 
@@ -292,12 +292,12 @@ export default function RoutePlanner({
               style={{
                 fontSize: "0.625rem",
                 fontWeight: 700,
-                color: "var(--text-muted, #737987)",
+                color: "var(--text-muted, #8A97A5)",
                 textTransform: "uppercase",
                 letterSpacing: "0.03em",
               }}
             >
-              FROM
+              {t("routes.from", "FROM")}
             </label>
             <button
               type="button"
@@ -309,19 +309,19 @@ export default function RoutePlanner({
                 padding: 0,
                 fontSize: "0.625rem",
                 fontWeight: 600,
-                color: isLocating ? "var(--text-muted, #737987)" : "var(--accent-soft-blue, #7B8BC8)",
+                color: isLocating ? "var(--text-muted, #8A97A5)" : "var(--accent, #245B86)",
                 cursor: isLocating ? "wait" : "pointer",
                 textDecoration: "underline",
               }}
               title="Set origin to current location or active junction"
             >
-              {isLocating ? "Locating..." : "Use Current Location"}
+              {isLocating ? t("common.detectingLocation", "Locating...") : t("routes.useCurrentLocation", "Use Current Location")}
             </button>
           </div>
 
           <input
             type="text"
-            placeholder="Search or select origin"
+            placeholder={t("routes.searchOriginPlaceholder", "Search or select origin")}
             value={fromName}
             onFocus={() => {
               setFocusedField("from");
@@ -337,10 +337,10 @@ export default function RoutePlanner({
               width: "100%",
               padding: "0.4rem 0.55rem",
               fontSize: "0.75rem",
-              background: "var(--bg-surface-elevated, #252936)",
-              border: "1px solid var(--border-default, #3D3F4E)",
+              background: "var(--bg-input, #FFFFFF)",
+              border: "1px solid var(--border-default, #D8E0E8)",
               borderRadius: "4px",
-              color: "var(--text-primary, #F4F5F7)",
+              color: "var(--text-primary, #162334)",
               boxSizing: "border-box",
             }}
           />
@@ -352,10 +352,10 @@ export default function RoutePlanner({
                 top: "100%",
                 left: 0,
                 right: 0,
-                background: "var(--bg-surface-elevated, #252936)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-card, #FFFFFF)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+                boxShadow: "var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))",
                 zIndex: 50,
                 maxHeight: "200px",
                 overflowY: "auto",
@@ -364,8 +364,8 @@ export default function RoutePlanner({
               {/* Show RECENT section when nothing typed */}
               {!fromName.trim() && recentLocations.length > 0 && (
                 <>
-                  <div style={{ padding: "0.3rem 0.5rem 0.15rem", fontSize: "0.5625rem", fontWeight: 700, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border-light, #2C303C)" }}>
-                    Recent
+                  <div style={{ padding: "0.3rem 0.5rem 0.15rem", fontSize: "0.5625rem", fontWeight: 700, color: "var(--text-muted, #8A97A5)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border-light, #E7ECF1)" }}>
+                    {t("common.recent", "Recent")}
                   </div>
                   {recentLocations.map((locName) => (
                     <div
@@ -375,11 +375,11 @@ export default function RoutePlanner({
                         setShowFromSuggestions(false);
                         if (onLocationChange) onLocationChange();
                       }}
-                      style={{ padding: "0.4rem 0.5rem", cursor: "pointer", fontSize: "0.75rem", color: "var(--text-primary, #F4F5F7)", fontWeight: 600, borderBottom: "1px solid var(--border-light, #2C303C)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #2C303C)")}
+                      style={{ padding: "0.4rem 0.5rem", cursor: "pointer", fontSize: "0.75rem", color: "var(--text-primary, #162334)", fontWeight: 600, borderBottom: "1px solid var(--border-light, #E7ECF1)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
-                      {locName}
+                      {tJunction(locName)}
                     </div>
                   ))}
                 </>
@@ -399,22 +399,22 @@ export default function RoutePlanner({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    borderBottom: "1px solid var(--border-light, #2C303C)",
+                    borderBottom: "1px solid var(--border-light, #E7ECF1)",
                     gap: "0.5rem",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #2C303C)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.75rem", color: "var(--text-primary, #F4F5F7)" }}>
-                      {loc.name}
+                    <span style={{ fontWeight: 600, fontSize: "0.75rem", color: "var(--text-primary, #162334)" }}>
+                      {tJunction(loc.name)}
                     </span>
-                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", marginLeft: "6px" }}>
-                      {loc.district || "Tamil Nadu"}
+                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #8A97A5)", marginLeft: "6px" }}>
+                      {tJunction(loc.district || "Tamil Nadu")}
                     </span>
                   </div>
-                  <span style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--text-muted, #737987)", flexShrink: 0 }}>
-                    {loc.category || "Location"}
+                  <span style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--text-muted, #8A97A5)", flexShrink: 0 }}>
+                    {t(`category.${(loc.category || "location").toLowerCase()}`, loc.category || "Location")}
                   </span>
                 </div>
               ))}
@@ -428,8 +428,8 @@ export default function RoutePlanner({
             type="button"
             onClick={handleSwap}
             style={{
-              border: "1px solid var(--border-default, #3D3F4E)",
-              background: "var(--bg-surface-secondary, #2C303C)",
+              border: "1px solid var(--border-default, #D8E0E8)",
+              background: "var(--bg-surface-secondary, #26333E)",
               borderRadius: "4px",
               padding: "2px 8px",
               cursor: "pointer",
@@ -437,13 +437,13 @@ export default function RoutePlanner({
               alignItems: "center",
               gap: "4px",
               fontSize: "0.625rem",
-              color: "var(--text-secondary, #A7ACB8)",
+              color: "var(--text-secondary, #344256)",
               fontWeight: 600,
             }}
             title="Swap Origin and Destination"
           >
             <ArrowRightLeft size={10} />
-            <span>Swap</span>
+            <span>{t("routes.swap", "Swap")}</span>
           </button>
         </div>
 
@@ -453,18 +453,18 @@ export default function RoutePlanner({
             style={{
               fontSize: "0.625rem",
               fontWeight: 700,
-              color: "var(--text-muted, #737987)",
+              color: "var(--text-muted, #8A97A5)",
               textTransform: "uppercase",
               display: "block",
               marginBottom: "3px",
               letterSpacing: "0.03em",
             }}
           >
-            TO
+            {t("routes.to", "TO")}
           </label>
           <input
             type="text"
-            placeholder="Search or select destination"
+            placeholder={t("routes.searchDestinationPlaceholder", "Search or select destination")}
             value={toName}
             onFocus={() => {
               setFocusedField("to");
@@ -480,10 +480,10 @@ export default function RoutePlanner({
               width: "100%",
               padding: "0.4rem 0.55rem",
               fontSize: "0.75rem",
-              background: "var(--bg-surface-elevated, #252936)",
-              border: "1px solid var(--border-default, #3D3F4E)",
+              background: "var(--bg-input, #FFFFFF)",
+              border: "1px solid var(--border-default, #D8E0E8)",
               borderRadius: "4px",
-              color: "var(--text-primary, #F4F5F7)",
+              color: "var(--text-primary, #162334)",
               boxSizing: "border-box",
             }}
           />
@@ -495,10 +495,10 @@ export default function RoutePlanner({
                 top: "100%",
                 left: 0,
                 right: 0,
-                background: "var(--bg-surface-elevated, #252936)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-card, #FFFFFF)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.35)",
+                boxShadow: "var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15))",
                 zIndex: 50,
                 maxHeight: "200px",
                 overflowY: "auto",
@@ -507,8 +507,8 @@ export default function RoutePlanner({
               {/* Show RECENT section when nothing typed */}
               {!toName.trim() && recentLocations.length > 0 && (
                 <>
-                  <div style={{ padding: "0.3rem 0.5rem 0.15rem", fontSize: "0.5625rem", fontWeight: 700, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border-light, #2C303C)" }}>
-                    Recent
+                  <div style={{ padding: "0.3rem 0.5rem 0.15rem", fontSize: "0.5625rem", fontWeight: 700, color: "var(--text-muted, #8A97A5)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border-light, #E7ECF1)" }}>
+                    {t("common.recent", "Recent")}
                   </div>
                   {recentLocations.map((locName) => (
                     <div
@@ -518,11 +518,11 @@ export default function RoutePlanner({
                         setShowToSuggestions(false);
                         if (onLocationChange) onLocationChange();
                       }}
-                      style={{ padding: "0.4rem 0.5rem", cursor: "pointer", fontSize: "0.75rem", color: "var(--text-primary, #F4F5F7)", fontWeight: 600, borderBottom: "1px solid var(--border-light, #2C303C)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #2C303C)")}
+                      style={{ padding: "0.4rem 0.5rem", cursor: "pointer", fontSize: "0.75rem", color: "var(--text-primary, #162334)", fontWeight: 600, borderBottom: "1px solid var(--border-light, #E7ECF1)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                     >
-                      {locName}
+                      {tJunction(locName)}
                     </div>
                   ))}
                 </>
@@ -542,22 +542,22 @@ export default function RoutePlanner({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    borderBottom: "1px solid var(--border-light, #2C303C)",
+                    borderBottom: "1px solid var(--border-light, #E7ECF1)",
                     gap: "0.5rem",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #2C303C)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-card-hover, #EEF2F6)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.75rem", color: "var(--text-primary, #F4F5F7)" }}>
-                      {loc.name}
+                    <span style={{ fontWeight: 600, fontSize: "0.75rem", color: "var(--text-primary, #162334)" }}>
+                      {tJunction(loc.name)}
                     </span>
-                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #737987)", marginLeft: "6px" }}>
-                      {loc.district || "Tamil Nadu"}
+                    <span style={{ fontSize: "0.625rem", color: "var(--text-muted, #8A97A5)", marginLeft: "6px" }}>
+                      {tJunction(loc.district || "Tamil Nadu")}
                     </span>
                   </div>
-                  <span style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--text-muted, #737987)", flexShrink: 0 }}>
-                    {loc.category || "Location"}
+                  <span style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--text-muted, #8A97A5)", flexShrink: 0 }}>
+                    {t(`category.${(loc.category || "location").toLowerCase()}`, loc.category || "Location")}
                   </span>
                 </div>
               ))}
@@ -572,8 +572,8 @@ export default function RoutePlanner({
             disabled={isLoading || !fromName.trim() || !toName.trim()}
             style={{
               flex: 1,
-              background: "var(--accent-soft-blue, #7B8BC8)",
-              color: "#111315",
+              background: "var(--accent, #245B86)",
+              color: "#FFFFFF",
               border: "none",
               borderRadius: "4px",
               padding: "0.5rem",
@@ -592,10 +592,10 @@ export default function RoutePlanner({
             {isLoading ? (
               <>
                 <Loader2 size={12} className="animate-spin" />
-                <span>{t("common.calculatingRoute", "CALCULATING ROUTE...")}</span>
+                <span>{t("actions.calculatingRoute", "CALCULATING ROUTE...")}</span>
               </>
             ) : (
-              <span>{t("common.calculateRoute", "CALCULATE ROUTE")}</span>
+              <span>{t("actions.calculateRoute", "CALCULATE ROUTE")}</span>
             )}
           </button>
 
@@ -609,9 +609,9 @@ export default function RoutePlanner({
                 if (onLocationChange) onLocationChange();
               }}
               style={{
-                background: "var(--bg-surface-secondary, #2C303C)",
-                color: "var(--text-secondary, #A7ACB8)",
-                border: "1px solid var(--border-default, #3D3F4E)",
+                background: "var(--bg-surface-secondary, #26333E)",
+                color: "var(--text-secondary, #344256)",
+                border: "1px solid var(--border-default, #D8E0E8)",
                 borderRadius: "4px",
                 padding: "0.5rem 0.75rem",
                 fontSize: "0.75rem",
@@ -625,7 +625,7 @@ export default function RoutePlanner({
               title="Clear route and locations"
             >
               <RotateCcw size={11} />
-              <span>{t("common.clear", "Clear")}</span>
+              <span>{t("actions.clear", "Clear")}</span>
             </button>
           )}
         </div>

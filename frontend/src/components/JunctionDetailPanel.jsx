@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { getRiskLevel } from "../services/tamilNaduTrafficData";
+import { useSettings } from "../context/SettingsContext";
 
 export default function JunctionDetailPanel({
   junction,
@@ -10,6 +11,7 @@ export default function JunctionDetailPanel({
   onOfficerAction,
   activeCameraId,
 }) {
+  const { t, tJunction } = useSettings();
   const [decisionFeedback, setDecisionFeedback] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [isRouteEvaluated, setIsRouteEvaluated] = useState(false);
@@ -68,7 +70,15 @@ export default function JunctionDetailPanel({
 
   // 2. Diversion recommendation text
   const recommendedRouteText = div.recommendedName || "the flyover route";
-  const diversionWordingClean = `Use ${recommendedRouteText} to reduce congestion at ${junction.name}.`;
+  const jncName = junction.name || "this junction";
+  const diversionWordingClean = t(
+    "diversion.useAlternateRoute",
+    {
+      route: tJunction ? tJunction(recommendedRouteText) : recommendedRouteText,
+      location: tJunction ? tJunction(jncName) : jncName,
+    },
+    `Use ${recommendedRouteText} to reduce congestion at ${jncName}.`
+  );
 
   // 3. Traffic Forecast readings
   const nowVal = pred.current || (isCritical ? "HIGH" : "MODERATE");
@@ -76,10 +86,10 @@ export default function JunctionDetailPanel({
   const plus30Val = pred.next30Min || (isCritical ? "CRITICAL" : "MODERATE");
   const confidenceVal = pred.confidence ? `${pred.confidence}%` : "90%";
   const expectedTextBold = (isCritical || plus15Val === "CRITICAL" || plus30Val === "CRITICAL")
-    ? "Congestion increasing"
+    ? t("forecast.congestionIncreasing", "Congestion increasing")
     : junction.congestionScore <= 0.35
-    ? "Traffic flow stable"
-    : "Moderate inflow persisting";
+    ? t("forecast.flowStable", "Traffic flow stable")
+    : t("forecast.moderateInflow", "Moderate inflow persisting");
 
   // Forecast color helper: use neutral palette primarily unless meaningful severity shift occurs
   const getForecastColor = (val) => {
@@ -125,7 +135,7 @@ export default function JunctionDetailPanel({
                 textTransform: "uppercase",
               }}
             >
-              {statusLabel}
+              {t(`status.${statusLabel.toLowerCase()}`, statusLabel)}
             </span>
           </div>
 
@@ -139,10 +149,10 @@ export default function JunctionDetailPanel({
               textTransform: "uppercase",
             }}
           >
-            {junction.name}
+            {tJunction ? tJunction(junction.name) : junction.name}
           </h3>
           <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted, #737987)", marginTop: "1px" }}>
-            {junction.area || junction.district} • {junction.district}
+            {(tJunction ? tJunction(junction.area || junction.district) : (junction.area || junction.district))} • {(tJunction ? tJunction(junction.district) : junction.district)}
           </div>
         </div>
 
@@ -158,7 +168,7 @@ export default function JunctionDetailPanel({
                 letterSpacing: "0.05em",
               }}
             >
-              TRAFFIC RISK
+              {t("kpi.trafficRisk", "TRAFFIC RISK")}
             </div>
             <div
               style={{
@@ -186,7 +196,7 @@ export default function JunctionDetailPanel({
                 display: "flex",
                 alignItems: "center",
               }}
-              title="Close panel"
+              title={t("common.close", "Close panel")}
             >
               <X size={16} />
             </button>
@@ -215,7 +225,7 @@ export default function JunctionDetailPanel({
               transition: "all 0.15s ease",
             }}
           >
-            Approve
+            {t("actions.approve", "Approve")}
           </button>
 
           <button
@@ -236,7 +246,7 @@ export default function JunctionDetailPanel({
               transition: "all 0.15s ease",
             }}
           >
-            Reject
+            {t("actions.reject", "Reject")}
           </button>
 
           <button
@@ -257,7 +267,7 @@ export default function JunctionDetailPanel({
               transition: "all 0.15s ease",
             }}
           >
-            Resolve
+            {t("actions.resolve", "Resolve")}
           </button>
         </div>
 
@@ -265,8 +275,8 @@ export default function JunctionDetailPanel({
           <div style={{ marginTop: "0.15rem" }}>
             <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--status-normal, #22C55E)" }}>
               {decisionFeedback.type === "DIVERSION"
-                ? `Action Approved: ${decisionFeedback.route}`
-                : `Dispatched: ${decisionFeedback.action.replace("_", " ")}`}
+                ? `${t("alerts.actionAccepted", "Action Approved")}: ${tJunction ? tJunction(decisionFeedback.route) : decisionFeedback.route}`
+                : `${t("alerts.actionUpdate", "Dispatched")}: ${decisionFeedback.action.replace("_", " ")}`}
             </span>
           </div>
         )}
@@ -291,7 +301,7 @@ export default function JunctionDetailPanel({
             textTransform: "uppercase",
           }}
         >
-          DIVERSION RECOMMENDED
+          {t("diversion.recommendedTitle", "DIVERSION RECOMMENDED")}
         </div>
         <div
           style={{
@@ -323,7 +333,7 @@ export default function JunctionDetailPanel({
               transition: "all 0.15s ease",
             }}
           >
-            Review Diversion
+            {t("actions.reviewDiversion", "Review Diversion")}
           </button>
         </div>
       </div>
@@ -340,50 +350,51 @@ export default function JunctionDetailPanel({
         }}
       >
         <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            VEHICLES
+          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-secondary, #B5BAC7)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {t("traffic.vehicles", "Vehicles").toUpperCase()}
           </div>
           <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-primary, #F4F5F7)", marginTop: "2px", fontFamily: "var(--font-sans)", whiteSpace: "nowrap" }}>
-            {m.vehicleCount != null ? m.vehicleCount : "Data unavailable"}
+            {m.vehicleCount != null ? m.vehicleCount : t("common.dataUnavailable", "Data unavailable")}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            SPEED
+          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-secondary, #B5BAC7)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {t("traffic.averageSpeed", "Speed").toUpperCase()}
           </div>
           <div style={{ fontSize: "1.25rem", fontWeight: 700, color: m.averageSpeedKmh != null && m.averageSpeedKmh < 20 ? "var(--status-critical, #F45E70)" : "var(--text-primary, #F4F5F7)", marginTop: "2px", fontFamily: "var(--font-sans)", whiteSpace: "nowrap" }}>
-            {m.averageSpeedKmh != null ? `${m.averageSpeedKmh} km/h` : "Data unavailable"}
+            {m.averageSpeedKmh != null ? `${m.averageSpeedKmh} km/h` : t("common.dataUnavailable", "Data unavailable")}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            FLOW
+          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-secondary, #B5BAC7)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {t("traffic.flow", "Flow").toUpperCase()}
           </div>
           <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--text-primary, #F4F5F7)", marginTop: "2px", fontFamily: "var(--font-sans)", whiteSpace: "nowrap" }}>
-            {m.trafficFlowVpm != null ? `${m.trafficFlowVpm} veh/min` : "Data unavailable"}
+            {m.trafficFlowVpm != null ? `${m.trafficFlowVpm} veh/min` : t("common.dataUnavailable", "Data unavailable")}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, color: "var(--text-muted, #737987)", textTransform: "uppercase", letterSpacing: "0.03em" }}>
-            OCCUPANCY
+          <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-secondary, #B5BAC7)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            {t("traffic.occupancy", "Occupancy").toUpperCase()}
           </div>
           <div style={{ fontSize: "1.25rem", fontWeight: 700, color: m.roadOccupancyPct != null && m.roadOccupancyPct > 70 ? "var(--status-critical, #F45E70)" : "var(--text-primary, #F4F5F7)", marginTop: "2px", fontFamily: "var(--font-sans)", whiteSpace: "nowrap" }}>
-            {m.roadOccupancyPct != null ? `${m.roadOccupancyPct}%` : "Data unavailable"}
+            {m.roadOccupancyPct != null ? `${m.roadOccupancyPct}%` : t("common.dataUnavailable", "Data unavailable")}
           </div>
         </div>
       </div>
 
-      {/* 5. TRAFFIC FORECAST + CONFIDENCE ON SAME HEADER LINE */}
+      {/* 5. TRAFFIC FORECAST + EXPECTED TREND ON HEADER LINE (REPLACED CONFIDENCE) */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-            TRAFFIC FORECAST
+          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "var(--text-primary, #F4F5F7)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            {t("forecast.title", "TRAFFIC FORECAST")}
           </span>
-          <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "var(--text-muted, #737987)", letterSpacing: "0.03em" }}>
-            CONFIDENCE {confidenceVal}
+          <span style={{ fontSize: "0.8125rem", letterSpacing: "0.01em" }}>
+            <span style={{ color: "var(--text-secondary, #A7ACB8)", fontWeight: 600 }}>{t("forecast.expected", "Expected")}: </span>
+            <span style={{ color: "var(--text-primary, #F4F5F7)", fontWeight: 800 }}>{expectedTextBold}</span>
           </span>
         </div>
 
@@ -391,36 +402,30 @@ export default function JunctionDetailPanel({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", marginTop: "0.15rem" }}>
           <div>
             <div style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)", fontWeight: 700 }}>
-              NOW
+              {t("forecast.now", "NOW")}
             </div>
             <div style={{ fontSize: "0.875rem", fontWeight: 800, color: getForecastColor(nowVal), marginTop: "3px" }}>
-              {nowVal}
+              {t(`status.${(nowVal || "").toLowerCase()}`, nowVal)}
             </div>
           </div>
 
           <div>
             <div style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)", fontWeight: 700 }}>
-              +15 MIN
+              {t("forecast.min15", "+15 MIN")}
             </div>
             <div style={{ fontSize: "0.875rem", fontWeight: 800, color: getForecastColor(plus15Val), marginTop: "3px" }}>
-              {plus15Val}
+              {t(`status.${(plus15Val || "").toLowerCase()}`, plus15Val)}
             </div>
           </div>
 
           <div>
             <div style={{ fontSize: "0.6875rem", color: "var(--text-muted, #737987)", fontWeight: 700 }}>
-              +30 MIN
+              {t("forecast.min30", "+30 MIN")}
             </div>
             <div style={{ fontSize: "0.875rem", fontWeight: 800, color: getForecastColor(plus30Val), marginTop: "3px" }}>
-              {plus30Val}
+              {t(`status.${(plus30Val || "").toLowerCase()}`, plus30Val)}
             </div>
           </div>
-        </div>
-
-        {/* Expected line */}
-        <div style={{ marginTop: "0.35rem", fontSize: "0.75rem", color: "var(--text-secondary, #A7ACB8)" }}>
-          <span style={{ color: "var(--text-muted, #737987)", fontWeight: 600 }}>Expected: </span>
-          <span style={{ color: "var(--text-primary, #F4F5F7)", fontWeight: 700 }}>{expectedTextBold}</span>
         </div>
       </div>
     </div>
