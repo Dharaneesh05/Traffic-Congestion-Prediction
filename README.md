@@ -1,4 +1,3 @@
-<img width="457" height="312" alt="image" src="https://github.com/user-attachments/assets/aa53dbae-4c8a-4dc0-b416-8d15c2781281" />
 # Smart Traffic Control & Decision Support System
 
 An AI-assisted traffic monitoring and decision-support system for junction-level congestion analysis, multi-horizon traffic prediction, and intelligent route diversion.
